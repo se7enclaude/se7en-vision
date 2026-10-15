@@ -3,8 +3,8 @@
   const $ = (id) => document.getElementById(id);
   const base = location.pathname.replace(/\/+$/, '');
   const store = {
-    get(k, d) { try { const v = localStorage.getItem('relais-' + k); return v == null ? d : v; } catch { return d; } },
-    set(k, v) { try { localStorage.setItem('relais-' + k, v); } catch {} },
+    get(k, d) { try { const v = localStorage.getItem('vision-' + k); return v == null ? d : v; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('vision-' + k, v); } catch {} },
   };
 
   // ---------- Theme & viewport ----------
@@ -43,7 +43,7 @@
     show('msgView');
   }
   const expired = (text) => message('Lien expiré',
-    text || 'se7en Relais crée un nouveau lien à chaque ouverture. Scanne le QR code affiché sur le PC.');
+    text || 'se7en Vision crée un nouveau lien à chaque ouverture. Scanne le QR code affiché sur le PC.');
 
   // ---------- Startup ----------
   async function boot() {
@@ -52,7 +52,7 @@
     try { res = await fetch(base + '/me', { cache: 'no-store', credentials: 'same-origin' }); }
     catch { return message('PC injoignable', 'Vérifie ta connexion, puis réessaie.', { icon: 'wifi-off', button: 'Réessayer', onButton: boot }); }
     if (res.status === 404) return expired();
-    if (!res.ok) return message('PC injoignable', 'se7en Relais est peut-être fermé sur le PC.', { icon: 'wifi-off', button: 'Réessayer', onButton: boot });
+    if (!res.ok) return message('PC injoignable', 'se7en Vision est peut-être fermé sur le PC.', { icon: 'wifi-off', button: 'Réessayer', onButton: boot });
     const me = await res.json();
     if (me.authed) startControl(); else showPin();
   }
@@ -159,7 +159,7 @@
       ws = null; alive = false; framePending = false;
       clearInterval(pingTimer);
       if (e.code === 4001) return message('Accès fermé', 'Le PC a coupé l’accès. Scanne le nouveau QR code affiché sur l’écran.', { icon: 'unplug' });
-      if (e.code === 4002) return message('Ouvert ailleurs', 'se7en Relais a été ouvert dans un autre onglet.', { icon: 'copy', violet: true, button: 'Reprendre ici', onButton: startControl });
+      if (e.code === 4002) return message('Ouvert ailleurs', 'se7en Vision a été ouvert dans un autre onglet.', { icon: 'copy', violet: true, button: 'Reprendre ici', onButton: startControl });
       setLive(false, 'Reconnexion…');
       retryTimer = setTimeout(reconnect, 1500);
     };
@@ -280,8 +280,13 @@
     store.set('mode', m);
     document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('is-active', b.dataset.mode === m));
     stage.classList.toggle('pad', m === 'pad');
-    zoom = 1; clampView();
-    hint(m === 'pad' ? 'Glisse pour bouger, 2 doigts pour défiler' : 'Touche l’écran pour cliquer');
+    $('ctrlView').classList.toggle('joy', m === 'joy');
+    $('joypad').hidden = m !== 'joy';
+    zoom = 1;
+    requestAnimationFrame(layoutFrame);
+    hint(m === 'pad' ? 'Glisse pour bouger, 2 doigts pour défiler'
+      : m === 'joy' ? 'Pouce gauche : souris · « Clic » : maintiens pour glisser'
+      : 'Touche l’écran pour cliquer');
   }
   document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   setMode(mode);
@@ -325,7 +330,7 @@
     }
     const p = pts[0];
     g = { two: false, start: now, p0: p, last: p, lastT: now, moved: false, held: false, dragging: false, ring: null };
-    if (mode === 'touch') {
+    if (mode !== 'pad') {
       g.holdTimer = setTimeout(() => { if (g && !g.moved) { g.held = true; g.ring = ripple(p, 'hold'); } }, HOLD_MS);
     } else if (lastTap && now - lastTap.t < 300 && dist(lastTap.p, p) < 40) {
       g.dragPending = true; // tap, then touch again and slide = drag
@@ -342,7 +347,7 @@
       if (pts.length < 2) return;
       const c = mid(pts[0], pts[1]);
       if (dist(c, g.c0) > TAP_MOVE || Math.abs(dist(pts[0], pts[1]) - g.d0) > TAP_MOVE) g.moved = true;
-      if (mode === 'touch') {
+      if (mode !== 'pad') {
         // Pinch to zoom and pan the preview around the fingers.
         const z = Math.min(5, Math.max(1, g.z0 * dist(pts[0], pts[1]) / g.d0));
         const k = z / g.z0;
@@ -364,7 +369,7 @@
     const p = pts[0];
     if (!g.moved && dist(p, g.p0) > TAP_MOVE) {
       g.moved = true;
-      if (mode === 'touch') {
+      if (mode !== 'pad') {
         cancelHold();
         if (g.held) {
           // Press, hold, then slide: drag and drop.
@@ -381,7 +386,7 @@
       }
     }
     if (g.moved) {
-      if (mode === 'touch') {
+      if (mode !== 'pad') {
         if (g.dragging || zoom <= 1.01) moveAbs(p);
         else { tx += p.x - g.last.x; ty += p.y - g.last.y; clampView(); }
       } else {
@@ -417,7 +422,7 @@
       flushNow();
       send({ t: 'up', b: 'l' });
     } else if (!g.moved) {
-      if (mode === 'touch') {
+      if (mode !== 'pad') {
         if (onImage(g.p0)) {
           if (g.held) { clickAt(g.p0, 'r'); ripple(g.p0, 'right'); }
           else { clickAt(g.p0); ripple(g.p0); }
@@ -451,17 +456,17 @@
   window.addEventListener('mousemove', (e) => {
     if (!mouse) return;
     const p = stagePoint(e);
-    if (!mouse.moved && dist(p, mouse.p0) > 4) { mouse.moved = true; if (mode === 'touch') { send({ t: 'abs', ...toScreen(mouse.p0) }); send({ t: 'down', b: 'l' }); } }
+    if (!mouse.moved && dist(p, mouse.p0) > 4) { mouse.moved = true; if (mode !== 'pad') { send({ t: 'abs', ...toScreen(mouse.p0) }); send({ t: 'down', b: 'l' }); } }
     if (mouse.moved) {
-      if (mode === 'touch') moveAbs(p);
+      if (mode !== 'pad') moveAbs(p);
       else { pendDx += (p.x - mouse.last.x) * 2; pendDy += (p.y - mouse.last.y) * 2; queueFlush(); }
     }
     mouse.last = p;
   });
   window.addEventListener('mouseup', () => {
     if (!mouse) return;
-    if (mouse.moved) { flushNow(); if (mode === 'touch') send({ t: 'up', b: 'l' }); }
-    else if (mode === 'touch') clickAt(mouse.p0, mouse.button === 2 ? 'r' : 'l');
+    if (mouse.moved) { flushNow(); if (mode !== 'pad') send({ t: 'up', b: 'l' }); }
+    else if (mode !== 'pad') clickAt(mouse.p0, mouse.button === 2 ? 'r' : 'l');
     else send({ t: 'click', b: mouse.button === 2 ? 'r' : 'l' });
     ripple(mouse.p0, mouse.button === 2 ? 'right' : '');
     mouse = null;
@@ -488,12 +493,154 @@
   let holdLock = false;
   $('leftBtn').addEventListener('click', () => send({ t: 'click', b: 'l' }));
   $('rightBtn').addEventListener('click', () => send({ t: 'click', b: 'r' }));
-  $('holdBtn').addEventListener('click', () => {
+  function toggleHold() {
     holdLock = !holdLock;
     $('holdBtn').classList.toggle('on', holdLock);
+    $('jbHold').classList.toggle('on', holdLock);
+    flushNow();
     send({ t: holdLock ? 'down' : 'up', b: 'l' });
     hint(holdLock ? 'Clic maintenu : déplace la souris, puis relâche' : 'Clic relâché');
+  }
+  $('holdBtn').addEventListener('click', toggleHold);
+
+  // ---------- Joystick ----------
+  const capture = (el, e) => { try { el.setPointerCapture(e.pointerId); } catch {} };
+  // Left thumb: the stick sets the cursor's speed and direction (further = faster).
+  const joyZone = $('joyZone'), joyBase = $('joyBase'), joyKnob = $('joyKnob');
+  const JOY_DEAD = 0.1;
+  let joy = null; // { id, cx, cy, ux, uy, n, last }
+  $('joySpeed').value = store.get('joySpeed', '1.2');
+  $('joySpeed').addEventListener('change', () => store.set('joySpeed', $('joySpeed').value));
+
+  function joyRadius() { return joyBase.offsetWidth / 2; }
+  joyZone.addEventListener('pointerdown', (e) => {
+    if (joy) return;
+    e.preventDefault();
+    capture(joyZone, e);
+    const zr = joyZone.getBoundingClientRect();
+    const r = joyRadius();
+    // The stick appears under the thumb (kept inside the zone).
+    const cx = Math.min(Math.max(e.clientX, zr.left + r * 0.6), zr.right - r * 0.6);
+    const cy = Math.min(Math.max(e.clientY, zr.top + r * 0.6), zr.bottom - r * 0.6);
+    joyBase.style.left = (cx - zr.left) + 'px';
+    joyBase.style.top = (cy - zr.top) + 'px';
+    joyZone.classList.add('active');
+    joy = { id: e.pointerId, cx, cy, ux: 0, uy: 0, n: 0, last: performance.now() };
+    joyMove(e);
+    // A plain timer, not requestAnimationFrame: it keeps a steady pace even in Low Power Mode.
+    joy.timer = setInterval(joyTick, 16);
   });
+  joyZone.addEventListener('pointermove', (e) => { if (joy && e.pointerId === joy.id) { e.preventDefault(); joyMove(e); } });
+  const joyEnd = (e) => {
+    if (!joy || e.pointerId !== joy.id) return;
+    clearInterval(joy.timer);
+    joy = null;
+    flushNow();
+    joyZone.classList.remove('active');
+    joyKnob.style.transform = '';
+    joyBase.style.left = joyBase.style.top = '';
+  };
+  joyZone.addEventListener('pointerup', joyEnd);
+  joyZone.addEventListener('pointercancel', joyEnd);
+
+  function joyMove(e) {
+    const r = joyRadius();
+    let dx = e.clientX - joy.cx, dy = e.clientY - joy.cy;
+    const len = Math.hypot(dx, dy);
+    if (len > r) { dx *= r / len; dy *= r / len; }
+    joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+    const n = Math.min(1, len / r);
+    joy.n = n < JOY_DEAD ? 0 : (n - JOY_DEAD) / (1 - JOY_DEAD);
+    joy.ux = len ? dx / len : 0;
+    joy.uy = len ? dy / len : 0;
+  }
+
+  function joyTick() {
+    if (!joy) return;
+    const now = performance.now();
+    const dt = Math.min(0.05, Math.max(0, now - joy.last) / 1000);
+    joy.last = now;
+    if (joy.n > 0) {
+      // Gentle near the centre for precision, fast at the edge.
+      const speed = parseFloat($('joySpeed').value) * (60 + 1500 * Math.pow(joy.n, 2.2));
+      pendDx += joy.ux * speed * dt;
+      pendDy += joy.uy * speed * dt;
+      const sx = Math.trunc(pendDx), sy = Math.trunc(pendDy);
+      if (sx || sy) { send({ t: 'move', dx: sx, dy: sy }); pendDx -= sx; pendDy -= sy; }
+    }
+  }
+
+  // Right thumb: "Clic". Tap = left click, double tap = right click (or double-click),
+  // press and hold = keep the left button down to drag with the stick.
+  const jbMain = $('jbMain');
+  const HOLD_DRAG_MS = 380, DOUBLE_MS = 280;
+  let dblAction = store.get('dbl', 'right');
+  let mainPress = null, pendingClick = 0, lastTapAt = 0;
+  function renderDbl() { document.querySelectorAll('[data-dbl]').forEach((b) => b.classList.toggle('is-active', b.dataset.dbl === dblAction)); }
+  document.querySelectorAll('[data-dbl]').forEach((b) => b.addEventListener('click', () => { dblAction = b.dataset.dbl; store.set('dbl', dblAction); renderDbl(); }));
+  renderDbl();
+
+  jbMain.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    capture(jbMain, e);
+    jbMain.classList.add('pressed');
+    const press = { id: e.pointerId, dragging: false };
+    press.timer = setTimeout(() => {
+      press.dragging = true;
+      clearTimeout(pendingClick); pendingClick = 0;
+      flushNow();
+      if (!holdLock) send({ t: 'down', b: 'l' });
+      jbMain.classList.add('drag');
+      jbMain.querySelector('span').textContent = 'Glisser';
+      hint('Glisse avec le joystick, puis relâche');
+    }, HOLD_DRAG_MS);
+    mainPress = press;
+  });
+  const mainEnd = (e) => {
+    const press = mainPress;
+    if (!press || e.pointerId !== press.id) return;
+    mainPress = null;
+    clearTimeout(press.timer);
+    jbMain.classList.remove('pressed', 'drag');
+    jbMain.querySelector('span').textContent = 'Clic';
+    flushNow();
+    if (press.dragging) { if (!holdLock) send({ t: 'up', b: 'l' }); return; }
+    if (e.type === 'pointercancel') return;
+
+    const now = performance.now();
+    if (dblAction === 'double') {
+      send({ t: 'click', b: 'l' }); // two quick taps reach Windows as a double-click
+    } else if (pendingClick && now - lastTapAt < DOUBLE_MS) {
+      clearTimeout(pendingClick); pendingClick = 0;
+      send({ t: 'click', b: 'r' });
+      hint('Clic droit');
+    } else {
+      pendingClick = setTimeout(() => { pendingClick = 0; send({ t: 'click', b: 'l' }); }, DOUBLE_MS);
+    }
+    lastTapAt = now;
+  };
+  jbMain.addEventListener('pointerup', mainEnd);
+  jbMain.addEventListener('pointercancel', mainEnd);
+
+  $('jbRight').addEventListener('click', () => { flushNow(); send({ t: 'click', b: 'r' }); });
+  $('jbDouble').addEventListener('click', () => { flushNow(); send({ t: 'click', b: 'l', n: 2 }); });
+  $('jbHold').addEventListener('click', toggleHold);
+  $('jbKbd').addEventListener('click', () => $('kbdBtn').click());
+  $('joypad').addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // Scroll strip between the stick and the buttons.
+  const joyScroll = $('joyScroll');
+  let jsY = null, jsAcc = 0;
+  joyScroll.addEventListener('pointerdown', (e) => { e.preventDefault(); capture(joyScroll, e); jsY = e.clientY; jsAcc = 0; joyScroll.classList.add('active'); });
+  joyScroll.addEventListener('pointermove', (e) => {
+    if (jsY == null) return;
+    jsAcc += (e.clientY - jsY) * 5; jsY = e.clientY;
+    const step = Math.trunc(jsAcc / 40) * 40;
+    if (step) { send({ t: 'wheel', dy: step }); jsAcc -= step; }
+  });
+  const jsEnd = () => { jsY = null; joyScroll.classList.remove('active'); };
+  joyScroll.addEventListener('pointerup', jsEnd);
+  joyScroll.addEventListener('pointercancel', jsEnd);
 
   // ---------- Keyboard ----------
   const kbd = $('kbd');
@@ -596,8 +743,8 @@
   $('speed').addEventListener('change', () => store.set('speed', $('speed').value));
   $('leaveBtn').addEventListener('click', () => {
     closeSheet();
-    if (holdLock) $('holdBtn').click();
-    message('Déconnecté', 'Tu peux revenir tant que se7en Relais reste ouvert sur le PC.', { icon: 'log-out', violet: true, button: 'Se reconnecter', onButton: boot });
+    if (holdLock) toggleHold();
+    message('Déconnecté', 'Tu peux revenir tant que se7en Vision reste ouvert sur le PC.', { icon: 'log-out', violet: true, button: 'Se reconnecter', onButton: boot });
   });
 
   boot();

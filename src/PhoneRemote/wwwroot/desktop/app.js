@@ -5,7 +5,7 @@
 
   // Theme: remembered choice, else the system setting.
   function readTheme() {
-    try { return localStorage.getItem('relais-theme'); } catch { return null; }
+    try { return localStorage.getItem('vision-theme'); } catch { return null; }
   }
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
@@ -15,7 +15,7 @@
   applyTheme(readTheme() || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   document.querySelectorAll('[data-theme-btn]').forEach((b) => b.addEventListener('click', () => {
     applyTheme(b.dataset.themeBtn);
-    try { localStorage.setItem('relais-theme', b.dataset.themeBtn); } catch {}
+    try { localStorage.setItem('vision-theme', b.dataset.themeBtn); } catch {}
   }));
 
   function toast(text, icon = 'check') {

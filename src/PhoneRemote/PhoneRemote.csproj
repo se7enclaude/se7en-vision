@@ -7,13 +7,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <AssemblyName>se7en Relais</AssemblyName>
+    <AssemblyName>se7en Vision</AssemblyName>
     <RootNamespace>PhoneRemote</RootNamespace>
-    <Product>se7en Relais</Product>
+    <Product>se7en Vision</Product>
     <Company>se7en</Company>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <!-- WebView2 ships a WPF assembly we do not use; its WindowsBase reference conflict is harmless. -->
     <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>

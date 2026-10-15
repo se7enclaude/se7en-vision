@@ -1,8 +1,8 @@
-﻿# Builds dist\se7en-Relais.exe: a single exe (cloudflared included) ready for a GitHub release / Seventh Hub.
+﻿# Builds dist\se7en-Vision.exe: a single exe (cloudflared included) ready for a GitHub release / Seventh Hub.
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $publish = Join-Path $root 'dist\publish'
-$asset = Join-Path $root 'dist\se7en-Relais.exe'
+$asset = Join-Path $root 'dist\se7en-Vision.exe'
 $cloudflared = Join-Path $root 'tools\cloudflared.exe'
 
 if (-not (Test-Path $cloudflared)) {
@@ -24,7 +24,7 @@ dotnet publish (Join-Path $root 'src\PhoneRemote\PhoneRemote.csproj') `
     -o $publish
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish a échoué' }
 
-Copy-Item (Join-Path $publish 'se7en Relais.exe') $asset -Force
+Copy-Item (Join-Path $publish 'se7en Vision.exe') $asset -Force
 $hash = (Get-FileHash $asset -Algorithm SHA256).Hash
 $version = (Get-Item $asset).VersionInfo.ProductVersion
 Write-Host ''

@@ -1,15 +1,15 @@
-SE7EN RELAIS — contrôle ton PC depuis ton iPhone
+SE7EN VISION — contrôle ton PC depuis ton iPhone
 ================================================
 
 Utilisation
 -----------
-1. Installe se7en Relais depuis Seventh Hub (ou lance se7en-Relais.exe) sur le PC.
+1. Installe se7en Vision depuis Seventh Hub (ou lance se7en-Vision.exe) sur le PC.
 2. Scanne le QR code avec l'appareil photo de ton iPhone. Safari s'ouvre.
 3. Entre le code à 6 chiffres affiché sur le PC.
 4. C'est parti : tu vois l'écran du PC et tu le contrôles, en Wi-Fi comme en 4G/5G.
 
-Le lien et le code changent à chaque ouverture de se7en Relais.
-Ferme se7en Relais pour tout couper : le lien cesse aussitôt de fonctionner.
+Le lien et le code changent à chaque ouverture de se7en Vision.
+Ferme se7en Vision pour tout couper : le lien cesse aussitôt de fonctionner.
 
 Gestes sur l'iPhone
 -------------------
@@ -26,6 +26,15 @@ Mode Trackpad (comme un trackpad de portable)
   - Toucher avec 2 doigts : clic droit
   - Glisser avec 2 doigts : défiler
   - Toucher puis retoucher et glisser : glisser-déposer
+
+Mode Joystick (téléphone en portrait, comme une manette)
+  - Pouce gauche sur le joystick : déplace la souris (plus tu pousses, plus elle va vite)
+  - Bouton « Clic » : toucher = clic gauche, toucher 2 fois = clic droit
+    (ou double-clic, au choix dans les réglages)
+  - Rester appuyé sur « Clic » + joystick : glisser-déposer
+  - Droit, Double, Maintenir, Clavier : autour du bouton « Clic »
+  - Bande « Molette » au milieu : défiler
+  - En paysage : joystick à gauche, boutons à droite, écran au milieu
 
 Toujours disponibles
   - Bande à droite de l'aperçu : molette
@@ -47,7 +56,7 @@ Bon à savoir
 - Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur » :
   clique sur « Informations complémentaires » puis « Exécuter quand même ».
 - Les fenêtres lancées en administrateur (et les invites UAC) ne peuvent pas être
-  contrôlées, sauf si se7en Relais est lui-même lancé en administrateur.
+  contrôlées, sauf si se7en Vision est lui-même lancé en administrateur.
 - Sur iPhone, tu peux ajouter la page à l'écran d'accueil (Partager > Sur l'écran d'accueil)
-  pour l'avoir en plein écran — mais le lien change à chaque ouverture de se7en Relais.
-- se7en Relais a besoin d'Internet et de Microsoft Edge WebView2 (déjà inclus dans Windows 11).
+  pour l'avoir en plein écran — mais le lien change à chaque ouverture de se7en Vision.
+- se7en Vision a besoin d'Internet et de Microsoft Edge WebView2 (déjà inclus dans Windows 11).

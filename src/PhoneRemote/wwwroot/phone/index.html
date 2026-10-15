@@ -6,12 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="se7en Relais">
+<meta name="apple-mobile-web-app-title" content="se7en Vision">
 <meta name="format-detection" content="telephone=no">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#EDE7E1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121116" media="(prefers-color-scheme: dark)">
-<title>se7en Relais</title>
+<title>se7en Vision</title>
 <link rel="stylesheet" href="/ds/styles.css">
 <link rel="stylesheet" href="/phone/app.css">
 </head>
@@ -26,7 +26,7 @@
   <!-- PIN -->
   <section class="view center" id="pinView" hidden>
     <div class="card ca-glass">
-      <span class="wordmark">se7en Relais</span>
+      <span class="wordmark">se7en Vision</span>
       <h1>Entre le code</h1>
       <p class="sub">Il est affiché en grand sur l'écran du PC.</p>
       <label class="pin-boxes" id="pinBoxes">
@@ -92,10 +92,25 @@
                 aria-label="Clavier" enterkeyhint="enter"></textarea>
     </div>
 
+    <div class="joypad" id="joypad" hidden>
+      <div class="joy-zone" id="joyZone" aria-label="Joystick : déplace la souris">
+        <div class="joy-base" id="joyBase"><div class="joy-ring"></div><div class="joy-knob" id="joyKnob"><i class="ca-icon icon-move"></i></div></div>
+      </div>
+      <div class="joy-scroll" id="joyScroll" aria-label="Molette"><i class="ca-icon icon-chevron-up"></i><span>Molette</span><i class="ca-icon icon-chevron-down"></i></div>
+      <div class="joy-buttons">
+        <button class="jb jb-main" id="jbMain"><i class="ca-icon icon-mouse-pointer-click"></i><span>Clic</span></button>
+        <button class="jb jb-sat tl" id="jbRight"><i class="ca-icon icon-mouse-pointer-2"></i><span>Droit</span></button>
+        <button class="jb jb-sat tr" id="jbDouble"><i class="ca-icon icon-copy"></i><span>Double</span></button>
+        <button class="jb jb-sat bl" id="jbHold"><i class="ca-icon icon-grab"></i><span>Maintenir</span></button>
+        <button class="jb jb-sat br" id="jbKbd"><i class="ca-icon icon-keyboard"></i><span>Clavier</span></button>
+      </div>
+    </div>
+
     <nav class="toolbar ca-glass">
       <div class="ca-seg mode">
         <button class="ca-seg__item is-active" data-mode="touch"><i class="ca-icon icon-pointer"></i>Toucher</button>
         <button class="ca-seg__item" data-mode="pad"><i class="ca-icon icon-square-mouse-pointer"></i>Trackpad</button>
+        <button class="ca-seg__item" data-mode="joy"><i class="ca-icon icon-gamepad-2"></i>Joystick</button>
       </div>
       <div class="tools">
         <button class="tool" id="leftBtn"><i class="ca-icon icon-mouse-pointer-click"></i><span>Gauche</span></button>
@@ -142,6 +157,17 @@
     <div class="sheet-section" id="screenSection" hidden>
       <span class="caps">Écran</span>
       <div class="ca-seg full" id="screenSeg"></div>
+    </div>
+    <div class="sheet-section">
+      <span class="caps">Double toucher sur « Clic » (joystick)</span>
+      <div class="ca-seg full" id="dblSeg">
+        <button class="ca-seg__item" data-dbl="right">Clic droit</button>
+        <button class="ca-seg__item" data-dbl="double">Double-clic</button>
+      </div>
+    </div>
+    <div class="sheet-section">
+      <span class="caps">Vitesse du joystick</span>
+      <input type="range" id="joySpeed" min="0.4" max="3" step="0.1" value="1.2" class="range">
     </div>
     <div class="sheet-section">
       <span class="caps">Vitesse du trackpad</span>

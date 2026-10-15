@@ -11,7 +11,7 @@ namespace PhoneRemote;
 /// <summary>Desktop window: hosts the HTML interface (QR code, link, PIN, status) in WebView2.</summary>
 public sealed class MainForm : Form
 {
-    private const string Origin = "https://relais.app";
+    private const string Origin = "https://vision.app";
 
     private readonly SessionManager _session;
     private readonly RemoteServer _server;
@@ -169,10 +169,10 @@ public sealed class MainForm : Form
         return svg.GetGraphic(8, "#141416", "#FFFFFF", drawQuietZones: false, sizingMode: SvgQRCode.SizingMode.ViewBoxAttribute);
     }
 
-    /// <summary>For local testing only: set RELAIS_DEBUG=1 to write the local link and PIN to a file.</summary>
+    /// <summary>For local testing only: set VISION_DEBUG=1 to write the local link and PIN to a file.</summary>
     private void WriteDebugFile()
     {
-        if (Environment.GetEnvironmentVariable("RELAIS_DEBUG") != "1") return;
+        if (Environment.GetEnvironmentVariable("VISION_DEBUG") != "1") return;
         var dir = AppInfo.DataDir;
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "debug.txt"),

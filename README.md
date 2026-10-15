@@ -1,11 +1,11 @@
-# se7en Relais
+# se7en Vision
 
 Contrôle ton PC Windows depuis ton iPhone, de n'importe où, gratuitement.
 
-À l'ouverture, se7en Relais affiche un **QR code**, un **lien unique** et un **code à 6 chiffres**. Le lien et le code changent à chaque ouverture. Scanne le QR code, entre le code dans Safari, et tu peux :
+À l'ouverture, se7en Vision affiche un **QR code**, un **lien unique** et un **code à 6 chiffres**. Le lien et le code changent à chaque ouverture. Scanne le QR code, entre le code dans Safari, et tu peux :
 
 - **voir l'écran du PC** en direct, et zoomer dessus ;
-- **bouger la souris** en mode Toucher (tu touches l'écran) ou en mode Trackpad ;
+- **bouger la souris** en mode Toucher (tu touches l'écran), en mode Trackpad, ou en mode **Joystick** : un joystick sous le pouce gauche et un gros bouton « Clic » sous le pouce droit (toucher = clic gauche, deux fois = clic droit, rester appuyé = glisser) ;
 - faire un **clic gauche**, un **clic droit**, utiliser la **molette** et faire du **glisser-déposer** ;
 - **écrire au clavier**, accents compris, avec Ctrl, Alt, Maj, Windows, les flèches et des raccourcis tout prêts.
 
@@ -13,7 +13,7 @@ Contrôle ton PC Windows depuis ton iPhone, de n'importe où, gratuitement.
 
 ## Installation
 
-Installe-le depuis **Seventh Hub**, ou télécharge `se7en-Relais.exe` dans les [releases](../../releases/latest). Il n'y a rien d'autre à installer : cloudflared est inclus dans l'exe.
+Installe-le depuis **Seventh Hub**, ou télécharge `se7en-Vision.exe` dans les [releases](../../releases/latest). Il n'y a rien d'autre à installer : cloudflared est inclus dans l'exe.
 
 Windows peut afficher un avertissement SmartScreen, parce que l'exécutable n'est pas signé. Clique sur « Informations complémentaires », puis sur « Exécuter quand même ».
 
@@ -30,7 +30,7 @@ Il faut le SDK .NET 10 sous Windows.
 
 ```powershell
 dotnet run --project src/PhoneRemote        # lance l'appli (cloudflared doit être dans tools/)
-powershell -ExecutionPolicy Bypass -File build.ps1   # → dist/se7en-Relais.exe + SHA-256
+powershell -ExecutionPolicy Bypass -File build.ps1   # → dist/se7en-Vision.exe + SHA-256
 ```
 
 Organisation du code :
@@ -41,4 +41,4 @@ Organisation du code :
 - `src/PhoneRemote/Tunnel` : le lancement de cloudflared.
 - `src/PhoneRemote/wwwroot` : l'interface du PC (dans WebView2) et la page iPhone. Le design system est dans `ds/`.
 
-Pour publier une nouvelle version : change `<Version>` dans le `.csproj`, lance `build.ps1`, puis crée une release GitHub `vX.Y.Z`. Joins-y `se7en-Relais.exe` et ajoute la ligne `SHA-256 : <hash>` dans les notes de la release. Seventh Hub proposera alors la mise à jour.
+Pour publier une nouvelle version : change `<Version>` dans le `.csproj`, lance `build.ps1`, puis crée une release GitHub `vX.Y.Z`. Joins-y `se7en-Vision.exe` et ajoute la ligne `SHA-256 : <hash>` dans les notes de la release. Seventh Hub proposera alors la mise à jour.

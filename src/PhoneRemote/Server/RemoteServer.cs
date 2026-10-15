@@ -18,7 +18,7 @@ namespace PhoneRemote.Server;
 /// </summary>
 public sealed class RemoteServer : IAsyncDisposable
 {
-    private const string CookieName = "relais_session";
+    private const string CookieName = "vision_session";
 
     private readonly SessionManager _session;
     private readonly InputInjector _input = new();
