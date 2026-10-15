@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="se7en Relais">
+<meta name="format-detection" content="telephone=no">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#EDE7E1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121116" media="(prefers-color-scheme: dark)">
+<title>se7en Relais</title>
+<link rel="stylesheet" href="/ds/styles.css">
+<link rel="stylesheet" href="/phone/app.css">
+</head>
+<body class="ca-backdrop">
+<div class="app" id="app">
+
+  <!-- Loading -->
+  <section class="view center" id="loadView">
+    <span class="spinner"></span>
+  </section>
+
+  <!-- PIN -->
+  <section class="view center" id="pinView" hidden>
+    <div class="card ca-glass">
+      <span class="wordmark">se7en Relais</span>
+      <h1>Entre le code</h1>
+      <p class="sub">Il est affiché en grand sur l'écran du PC.</p>
+      <label class="pin-boxes" id="pinBoxes">
+        <input id="pinInput" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"
+               maxlength="6" aria-label="Code à 6 chiffres" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <span class="box"></span><span class="box"></span><span class="box"></span>
+        <span class="gap"></span>
+        <span class="box"></span><span class="box"></span><span class="box"></span>
+      </label>
+      <p class="pin-msg" id="pinMsg"></p>
+      <button class="ca-btn ca-btn--primary ca-btn--lg wide" id="pinBtn" disabled>Se connecter</button>
+    </div>
+  </section>
+
+  <!-- Messages (expired, busy, kicked) -->
+  <section class="view center" id="msgView" hidden>
+    <div class="card ca-glass">
+      <span class="msg-icon" id="msgIcon"><i class="ca-icon icon-link-2-off"></i></span>
+      <h1 id="msgTitle">Lien expiré</h1>
+      <p class="sub" id="msgText"></p>
+      <button class="ca-btn ca-btn--primary ca-btn--lg wide" id="msgBtn" hidden>Réessayer</button>
+    </div>
+  </section>
+
+  <!-- Control -->
+  <section class="view control" id="ctrlView" hidden>
+    <header class="bar ca-glass">
+      <span class="live" id="liveDot"></span>
+      <div class="bar-text">
+        <div class="bar-title" id="pcName">PC</div>
+        <div class="bar-sub mono" id="latency">Connexion…</div>
+      </div>
+      <button class="ca-ibtn ca-ibtn--glass ib" id="zoomResetBtn" hidden aria-label="Réinitialiser le zoom"><i class="ca-icon icon-minimize-2"></i></button>
+      <button class="ca-ibtn ca-ibtn--glass ib" id="moreBtn" aria-label="Plus d'options"><i class="ca-icon icon-sliders-horizontal"></i></button>
+    </header>
+
+    <div class="stage" id="stage">
+      <div class="frame" id="frame"><img id="shot" alt="" draggable="false"></div>
+      <div class="stage-msg" id="stageMsg"><span class="spinner"></span><span>Chargement de l'écran</span></div>
+      <div class="ripple-layer" id="ripples"></div>
+      <div class="wheel" id="wheel" aria-label="Molette"><i class="ca-icon icon-chevrons-up-down"></i></div>
+      <div class="hint-chip" id="hintChip"></div>
+    </div>
+
+    <div class="keys ca-glass" id="keys" hidden>
+      <div class="keys-row">
+        <button class="key mod" data-mod="Ctrl">Ctrl</button>
+        <button class="key mod" data-mod="Alt">Alt</button>
+        <button class="key mod" data-mod="Shift">Maj</button>
+        <button class="key mod" data-mod="Win"><i class="ca-icon icon-app-window"></i></button>
+        <button class="key" data-key="Escape">Échap</button>
+        <button class="key" data-key="Tab">Tab</button>
+        <button class="key" data-key="Left"><i class="ca-icon icon-arrow-left"></i></button>
+        <button class="key" data-key="Up"><i class="ca-icon icon-arrow-up"></i></button>
+        <button class="key" data-key="Down"><i class="ca-icon icon-arrow-down"></i></button>
+        <button class="key" data-key="Right"><i class="ca-icon icon-arrow-right"></i></button>
+        <button class="key" data-key="Delete">Suppr</button>
+        <button class="key" data-key="Home">Début</button>
+        <button class="key" data-key="End">Fin</button>
+        <button class="key" data-key="F5">F5</button>
+      </div>
+      <textarea id="kbd" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"
+                aria-label="Clavier" enterkeyhint="enter"></textarea>
+    </div>
+
+    <nav class="toolbar ca-glass">
+      <div class="ca-seg mode">
+        <button class="ca-seg__item is-active" data-mode="touch"><i class="ca-icon icon-pointer"></i>Toucher</button>
+        <button class="ca-seg__item" data-mode="pad"><i class="ca-icon icon-square-mouse-pointer"></i>Trackpad</button>
+      </div>
+      <div class="tools">
+        <button class="tool" id="leftBtn"><i class="ca-icon icon-mouse-pointer-click"></i><span>Gauche</span></button>
+        <button class="tool" id="rightBtn"><i class="ca-icon icon-mouse-pointer-2"></i><span>Droit</span></button>
+        <button class="tool" id="holdBtn"><i class="ca-icon icon-grab"></i><span>Maintenir</span></button>
+        <button class="tool" id="kbdBtn"><i class="ca-icon icon-keyboard"></i><span>Clavier</span></button>
+      </div>
+    </nav>
+  </section>
+
+  <!-- Options sheet -->
+  <div class="scrim" id="scrim" hidden></div>
+  <section class="sheet ca-glass" id="sheet" hidden>
+    <div class="grabber"></div>
+    <div class="sheet-section">
+      <span class="caps">Raccourcis</span>
+      <div class="shortcuts">
+        <button class="sc" data-k="C" data-m="Ctrl"><i class="ca-icon icon-copy"></i>Copier</button>
+        <button class="sc" data-k="V" data-m="Ctrl"><i class="ca-icon icon-clipboard-paste"></i>Coller</button>
+        <button class="sc" data-k="X" data-m="Ctrl"><i class="ca-icon icon-scissors"></i>Couper</button>
+        <button class="sc" data-k="Z" data-m="Ctrl"><i class="ca-icon icon-undo-2"></i>Annuler</button>
+        <button class="sc" data-k="A" data-m="Ctrl"><i class="ca-icon icon-text-select"></i>Tout</button>
+        <button class="sc" data-k="Tab" data-m="Alt"><i class="ca-icon icon-layers"></i>Alt+Tab</button>
+        <button class="sc" data-k="D" data-m="Win"><i class="ca-icon icon-monitor"></i>Bureau</button>
+        <button class="sc" data-k="E" data-m="Win"><i class="ca-icon icon-folder"></i>Fichiers</button>
+        <button class="sc" data-k="Win" data-m=""><i class="ca-icon icon-layout-grid"></i>Démarrer</button>
+        <button class="sc" data-k="F4" data-m="Alt"><i class="ca-icon icon-x"></i>Fermer</button>
+        <button class="sc" data-k="Escape" data-m="Ctrl,Shift"><i class="ca-icon icon-activity"></i>Gestion.</button>
+        <button class="sc" data-k="MediaPlayPause" data-m=""><i class="ca-icon icon-play"></i>Lecture</button>
+        <button class="sc" data-k="VolumeDown" data-m=""><i class="ca-icon icon-volume-1"></i>Vol −</button>
+        <button class="sc" data-k="VolumeUp" data-m=""><i class="ca-icon icon-volume-2"></i>Vol +</button>
+        <button class="sc" data-k="VolumeMute" data-m=""><i class="ca-icon icon-volume-x"></i>Muet</button>
+        <button class="sc" data-k="Enter" data-m=""><i class="ca-icon icon-corner-down-left"></i>Entrée</button>
+      </div>
+    </div>
+    <div class="sheet-section">
+      <span class="caps">Qualité de l'image</span>
+      <div class="ca-seg full" id="qualitySeg">
+        <button class="ca-seg__item" data-q="fluid">Fluide</button>
+        <button class="ca-seg__item" data-q="balanced">Équilibrée</button>
+        <button class="ca-seg__item" data-q="sharp">Nette</button>
+      </div>
+    </div>
+    <div class="sheet-section" id="screenSection" hidden>
+      <span class="caps">Écran</span>
+      <div class="ca-seg full" id="screenSeg"></div>
+    </div>
+    <div class="sheet-section">
+      <span class="caps">Vitesse du trackpad</span>
+      <input type="range" id="speed" min="0.5" max="3" step="0.1" value="1.4" class="range">
+    </div>
+    <button class="ca-btn ca-btn--glass ca-btn--md wide" id="leaveBtn"><i class="ca-icon icon-log-out"></i>Se déconnecter</button>
+  </section>
+
+</div>
+<script src="/phone/app.js"></script>
+</body>
+</html>

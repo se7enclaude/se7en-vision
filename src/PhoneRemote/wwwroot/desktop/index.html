@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>se7en Relais</title>
+<link rel="stylesheet" href="/ds/styles.css">
+<link rel="stylesheet" href="/desktop/app.css">
+</head>
+<body class="ca-backdrop">
+  <header class="topbar ca-glass">
+    <span class="wordmark">se7en Relais</span>
+    <span id="badge" class="ca-badge ca-badge--well"><span class="ca-badge__dot"></span><span id="badgeText">Démarrage</span></span>
+    <span class="spacer"></span>
+    <div class="ca-seg" role="group" aria-label="Thème">
+      <button class="ca-seg__item" data-theme-btn="light"><i class="ca-icon icon-sun"></i>Clair</button>
+      <button class="ca-seg__item" data-theme-btn="dark"><i class="ca-icon icon-moon"></i>Sombre</button>
+    </div>
+  </header>
+
+  <main class="panel ca-glass">
+    <section class="qr-card ca-irid">
+      <div class="qr-box" id="qrBox">
+        <div class="qr-wait" id="qrWait">
+          <span class="spinner"></span>
+          <span>Création du lien sécurisé</span>
+        </div>
+        <div class="qr-error" id="qrError" hidden>
+          <i class="ca-icon icon-cloud-off"></i>
+          <span id="qrErrorText">Impossible de créer le lien.</span>
+          <button class="ca-btn ca-btn--primary ca-btn--sm" id="retryBtn"><i class="ca-icon icon-rotate-cw"></i>Réessayer</button>
+        </div>
+        <div class="qr" id="qr" hidden></div>
+      </div>
+      <div class="link-row">
+        <span class="link mono" id="link">—</span>
+        <button class="ca-ibtn ca-ibtn--solid copy" id="copyBtn" title="Copier le lien" disabled><i class="ca-icon icon-copy"></i></button>
+      </div>
+    </section>
+
+    <section class="side">
+      <div>
+        <h1>Contrôle ce PC depuis ton téléphone</h1>
+        <p class="sub">Scanne le QR code avec l'appareil photo de ton iPhone, puis entre le code ci-dessous.</p>
+      </div>
+
+      <div class="ca-tile pin-tile">
+        <span class="caps">Code</span>
+        <div class="pin mono" id="pin">––– –––</div>
+        <span class="hint" id="pinHint">Ne le donne qu'à la personne qui contrôle ce PC.</span>
+      </div>
+
+      <div class="ca-tile status-tile">
+        <span class="well" id="statusWell"><i class="ca-icon icon-smartphone" id="statusIcon"></i></span>
+        <div class="status-text">
+          <div class="status-title" id="statusTitle">En attente du téléphone</div>
+          <div class="status-desc" id="statusDesc">Le lien et le code changent à chaque ouverture.</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="ca-btn ca-btn--glass ca-btn--md" id="newLinkBtn"><i class="ca-icon icon-refresh-cw"></i>Nouveau lien</button>
+        <button class="ca-btn ca-btn--danger ca-btn--md" id="disconnectBtn" hidden><i class="ca-icon icon-unplug"></i>Déconnecter</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">Ferme se7en Relais pour tout couper : le lien cesse aussitôt de fonctionner.</footer>
+
+  <div class="toast-host" id="toastHost"></div>
+<script src="/desktop/app.js"></script>
+</body>
+</html>

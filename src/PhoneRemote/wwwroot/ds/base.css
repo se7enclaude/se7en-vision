@@ -1,0 +1,5 @@
+html,body{margin:0}
+body{font-family:var(--font-sans);font-size:var(--fs-body);line-height:var(--lh-body);letter-spacing:var(--ls-body);color:var(--text-primary);background:var(--bg-base);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+*,*::before,*::after{box-sizing:border-box}
+a{color:var(--accent);text-decoration:none}a:hover{color:var(--accent-hover);text-decoration:underline}
+.ca-backdrop{background:var(--backdrop);color:var(--text-primary)}

@@ -1,0 +1,53 @@
+SE7EN RELAIS — contrôle ton PC depuis ton iPhone
+================================================
+
+Utilisation
+-----------
+1. Installe se7en Relais depuis Seventh Hub (ou lance se7en-Relais.exe) sur le PC.
+2. Scanne le QR code avec l'appareil photo de ton iPhone. Safari s'ouvre.
+3. Entre le code à 6 chiffres affiché sur le PC.
+4. C'est parti : tu vois l'écran du PC et tu le contrôles, en Wi-Fi comme en 4G/5G.
+
+Le lien et le code changent à chaque ouverture de se7en Relais.
+Ferme se7en Relais pour tout couper : le lien cesse aussitôt de fonctionner.
+
+Gestes sur l'iPhone
+-------------------
+Mode Toucher (l'écran du PC sous ton doigt)
+  - Toucher : clic gauche à cet endroit
+  - Appui long : clic droit
+  - Appui long puis glisser : glisser-déposer (fichiers, fenêtres)
+  - Glisser : déplace la souris (ou l'aperçu quand il est zoomé)
+  - Pincer avec 2 doigts : zoomer sur l'aperçu
+
+Mode Trackpad (comme un trackpad de portable)
+  - Glisser : déplace la souris
+  - Toucher : clic gauche, toucher 2 fois : double-clic
+  - Toucher avec 2 doigts : clic droit
+  - Glisser avec 2 doigts : défiler
+  - Toucher puis retoucher et glisser : glisser-déposer
+
+Toujours disponibles
+  - Bande à droite de l'aperçu : molette
+  - Gauche / Droit : clics
+  - Maintenir : garde le clic gauche enfoncé (déplace, puis touche de nouveau pour lâcher)
+  - Clavier : clavier de l'iPhone + Ctrl, Alt, Maj, Windows, Échap, Tab, flèches...
+  - Bouton réglages (en haut à droite) : raccourcis (Copier, Coller, Alt+Tab, Bureau...),
+    qualité de l'image, choix de l'écran, vitesse du trackpad
+
+Sécurité
+--------
+- Ne donne le code qu'à quelqu'un en qui tu as confiance : il contrôle tout le PC.
+- Après 5 codes faux, le lien est désactivé et un nouveau QR code apparaît.
+- Un seul téléphone à la fois. Le bouton « Déconnecter » coupe l'accès immédiatement.
+- La connexion passe par un tunnel Cloudflare gratuit, chiffré en HTTPS.
+
+Bon à savoir
+------------
+- Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur » :
+  clique sur « Informations complémentaires » puis « Exécuter quand même ».
+- Les fenêtres lancées en administrateur (et les invites UAC) ne peuvent pas être
+  contrôlées, sauf si se7en Relais est lui-même lancé en administrateur.
+- Sur iPhone, tu peux ajouter la page à l'écran d'accueil (Partager > Sur l'écran d'accueil)
+  pour l'avoir en plein écran — mais le lien change à chaque ouverture de se7en Relais.
+- se7en Relais a besoin d'Internet et de Microsoft Edge WebView2 (déjà inclus dans Windows 11).

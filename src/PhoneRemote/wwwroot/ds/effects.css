@@ -1,0 +1,17 @@
+:root{
+--glass-blur:28px;/* @kind other */--glass-blur-tile:16px;/* @kind other */--glass-saturate:165%;/* @kind other */
+--shadow-glass:inset 0 1px 0 rgba(255,255,255,.70),inset 0 -1px 0 rgba(255,255,255,.15),0 40px 80px -30px rgba(48,32,22,.30);
+--shadow-tile:inset 0 1px 0 rgba(255,255,255,.60),0 10px 26px -14px rgba(48,32,22,.24);
+--shadow-pill:inset 0 1px 0 rgba(255,255,255,.95),0 12px 24px -12px rgba(48,32,22,.38);
+--shadow-accent:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -3px 8px rgba(60,30,160,.25),0 16px 28px -12px rgba(122,100,240,.60);
+--shadow-mint:inset 0 1px 0 rgba(255,255,255,.50),inset 0 -3px 8px rgba(20,110,95,.22),0 16px 28px -12px rgba(47,176,156,.55);
+--shadow-irid:inset 0 1px 0 rgba(255,255,255,.75),0 24px 48px -20px rgba(150,110,220,.50);
+--shadow-pop:0 24px 60px -16px rgba(30,20,16,.35),inset 0 1px 0 rgba(255,255,255,.7);
+--focus-ring:0 0 0 3px rgba(122,100,240,.35);
+}
+[data-theme="dark"]{
+--shadow-glass:inset 0 1px 0 rgba(255,255,255,.14),0 40px 80px -30px rgba(0,0,0,.65);
+--shadow-tile:inset 0 1px 0 rgba(255,255,255,.08),0 10px 26px -14px rgba(0,0,0,.5);
+--shadow-pill:inset 0 1px 0 rgba(255,255,255,.95),0 12px 24px -12px rgba(0,0,0,.6);
+--shadow-pop:0 24px 60px -16px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.12);
+}
