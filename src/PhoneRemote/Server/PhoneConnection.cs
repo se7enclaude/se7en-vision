@@ -24,6 +24,16 @@ public sealed class PhoneConnection
     private byte[]? _lastFrame;
     private bool _forceFrame = true;
 
+    // Video mode: ffmpeg frames go through a small queue; when the network falls behind,
+    // frames are dropped until the next keyframe (a delta frame without its predecessors can't be decoded).
+    private readonly object _videoGate = new();
+    private VideoStream? _video;
+    private int _videoWidth = 1280, _videoKbps = 2500;
+    private readonly Queue<(byte[] Data, bool Key)> _videoQueue = new();
+    private readonly SemaphoreSlim _videoReady = new(0);
+    private bool _videoDropping;
+    private const int VideoQueueMax = 6;
+
     public PhoneConnection(WebSocket ws, InputInjector input, ScreenCapturer capturer)
     {
         _ws = ws;
@@ -51,6 +61,7 @@ public sealed class PhoneConnection
         var ct = linked.Token;
         await SendInfo(ct);
         var sender = Task.Run(() => FrameLoop(ct), ct);
+        var videoSender = Task.Run(() => VideoLoop(ct), ct);
         try
         {
             await ReceiveLoop(ct);
@@ -60,7 +71,9 @@ public sealed class PhoneConnection
         finally
         {
             _cts.Cancel();
+            StopVideo();
             try { await sender; } catch { }
+            try { await videoSender; } catch { }
         }
     }
 
@@ -128,6 +141,17 @@ public sealed class PhoneConnection
                 _screen = Math.Clamp(m.GetProperty("i").GetInt32(), 0, ScreenCapturer.Screens.Length - 1);
                 _forceFrame = true;
                 await SendInfo(ct);
+                if (_video != null) await StartVideo(ct);
+                break;
+            case "video":
+                if (m.TryGetProperty("w", out var vw)) _videoWidth = Math.Clamp(vw.GetInt32(), 640, 2560);
+                if (m.TryGetProperty("kbps", out var vk)) _videoKbps = Math.Clamp(vk.GetInt32(), 500, 12000);
+                if (m.TryGetProperty("on", out var on) && on.ValueKind == JsonValueKind.True) await StartVideo(ct);
+                else StopVideo();
+                break;
+            case "power":
+                await SendText("{\"t\":\"power\",\"ok\":true}", ct);
+                PowerActions.Run(m.GetProperty("a").GetString() ?? "");
                 break;
             case "ping":
                 await SendText(JsonSerializer.Serialize(new { t = "pong", ts = Num(m, "ts") }), ct);
@@ -168,6 +192,80 @@ public sealed class PhoneConnection
             _lastFrame = frame;
             await _sendLock.WaitAsync(ct);
             try { await _ws.SendAsync(frame, WebSocketMessageType.Binary, true, ct); }
+            finally { _sendLock.Release(); }
+        }
+    }
+
+    // ---- Video -------------------------------------------------------------
+
+    private async Task StartVideo(CancellationToken ct)
+    {
+        StopVideo();
+        VideoStream video;
+        try
+        {
+            video = new VideoStream(ScreenCapturer.Bounds(_screen), _videoWidth, _videoKbps);
+        }
+        catch (Exception ex)
+        {
+            await SendText(JsonSerializer.Serialize(new { t = "video", state = "error", reason = ex.Message }), ct);
+            return;
+        }
+        video.FrameReady += (data, key) =>
+        {
+            lock (_videoGate)
+            {
+                if (_video != video) return;
+                if (_videoQueue.Count >= VideoQueueMax) { _videoQueue.Clear(); _videoDropping = true; }
+                if (_videoDropping && !key) return;
+                _videoDropping = false;
+                _videoQueue.Enqueue((data, key));
+            }
+            _videoReady.Release();
+        };
+        video.Stopped += reason =>
+        {
+            lock (_videoGate) { if (_video != video) return; }
+            _ = SendText(JsonSerializer.Serialize(new { t = "video", state = "error", reason }), ct);
+        };
+        lock (_videoGate)
+        {
+            _video = video;
+            _videoQueue.Clear();
+            _videoDropping = false;
+        }
+        await SendText("{\"t\":\"video\",\"state\":\"on\"}", ct);
+    }
+
+    private void StopVideo()
+    {
+        VideoStream? old;
+        lock (_videoGate)
+        {
+            old = _video;
+            _video = null;
+            _videoQueue.Clear();
+        }
+        old?.Dispose();
+    }
+
+    private async Task VideoLoop(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await _videoReady.WaitAsync(ct);
+            (byte[] Data, bool Key) item;
+            lock (_videoGate)
+            {
+                if (_videoQueue.Count == 0) continue;
+                item = _videoQueue.Dequeue();
+            }
+            // First byte tells the phone what follows: 1 = H.264 keyframe, 2 = H.264 frame (JPEG starts with 0xFF).
+            var msg = new byte[item.Data.Length + 1];
+            msg[0] = item.Key ? (byte)1 : (byte)2;
+            Buffer.BlockCopy(item.Data, 0, msg, 1, item.Data.Length);
+            await _sendLock.WaitAsync(ct);
+            try { await _ws.SendAsync(msg, WebSocketMessageType.Binary, true, ct); }
             finally { _sendLock.Release(); }
         }
     }

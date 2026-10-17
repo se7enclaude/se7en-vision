@@ -46,7 +46,13 @@ Toujours disponibles
   - Maintenir : garde le clic gauche enfoncé (déplace, puis touche de nouveau pour lâcher)
   - Clavier : clavier de l'iPhone + Ctrl, Alt, Maj, Windows, Échap, Tab, flèches...
   - Bouton réglages (en haut à droite) : raccourcis (Copier, Coller, Alt+Tab, Bureau...),
-    qualité de l'image, choix de l'écran, vitesse du trackpad
+    verrouiller / mettre en veille / redémarrer / éteindre le PC (avec confirmation),
+    affichage (Vidéo fluide ou Images), qualité, choix de l'écran, vitesses
+
+Affichage
+  - Vidéo fluide (par défaut) : 30 images par seconde, il faut iOS 16.4 ou plus récent
+  - Images : une image à la fois, plus lent mais marche partout et avec une connexion faible
+  - Si la vidéo ne peut pas démarrer, se7en Vision passe tout seul aux images
 
 Sécurité
 --------

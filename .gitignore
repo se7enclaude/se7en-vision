@@ -4,3 +4,4 @@ dist/
 tools/cloudflared.exe
 *.user
 .vs/
+tools/ffmpeg/

@@ -1,0 +1,13 @@
+se7en Vision inclut les programmes suivants, distribués séparément dans l'exécutable
+et lancés comme des programmes indépendants.
+
+cloudflared — Cloudflare, Inc.
+  Licence : Apache 2.0
+  Source  : https://github.com/cloudflare/cloudflared
+
+FFmpeg 9.0.2 « essentials build » — compilé par Gyan Doshi (gyan.dev)
+  Licence : GNU General Public License v3 (inclut libx264, GPL)
+  Binaire : https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2
+  Source  : https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
+            et les sources des bibliothèques listées sur https://www.gyan.dev/ffmpeg/builds/
+  Texte de la licence : https://www.gnu.org/licenses/gpl-3.0.html

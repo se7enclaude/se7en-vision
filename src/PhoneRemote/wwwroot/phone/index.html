@@ -65,7 +65,7 @@
     </header>
 
     <div class="stage" id="stage">
-      <div class="frame" id="frame"><img id="shot" alt="" draggable="false"></div>
+      <div class="frame" id="frame"><img id="shot" alt="" draggable="false"><canvas id="vid" hidden></canvas></div>
       <div class="stage-msg" id="stageMsg"><span class="spinner"></span><span>Chargement de l'écran</span></div>
       <div class="ripple-layer" id="ripples"></div>
       <div class="wheel" id="wheel" aria-label="Molette"><i class="ca-icon icon-chevrons-up-down"></i></div>
@@ -148,6 +148,23 @@
       </div>
     </div>
     <div class="sheet-section">
+      <span class="caps">PC</span>
+      <div class="shortcuts">
+        <button class="sc" data-power="lock"><i class="ca-icon icon-lock"></i>Verrouiller</button>
+        <button class="sc" data-power="sleep"><i class="ca-icon icon-moon"></i>Veille</button>
+        <button class="sc" data-power="restart"><i class="ca-icon icon-rotate-ccw"></i>Redémarrer</button>
+        <button class="sc danger" data-power="shutdown"><i class="ca-icon icon-power"></i>Éteindre</button>
+      </div>
+    </div>
+    <div class="sheet-section">
+      <span class="caps">Affichage</span>
+      <div class="ca-seg full" id="imgSeg">
+        <button class="ca-seg__item" data-img="video">Vidéo fluide</button>
+        <button class="ca-seg__item" data-img="jpeg">Images</button>
+      </div>
+      <span class="sheet-hint" id="imgHint"></span>
+    </div>
+    <div class="sheet-section">
       <span class="caps">Qualité de l'image</span>
       <div class="ca-seg full" id="qualitySeg">
         <button class="ca-seg__item" data-q="fluid">Fluide</button>
@@ -177,6 +194,15 @@
     <button class="ca-btn ca-btn--glass ca-btn--md wide" id="leaveBtn"><i class="ca-icon icon-log-out"></i>Se déconnecter</button>
   </section>
 
+  <div class="scrim" id="confirmScrim" hidden></div>
+  <section class="dialog ca-glass" id="confirmDlg" hidden role="alertdialog" aria-labelledby="cTitle">
+    <h2 id="cTitle"></h2>
+    <p id="cText"></p>
+    <div class="dialog-actions">
+      <button class="ca-btn ca-btn--glass ca-btn--md" id="cCancel">Annuler</button>
+      <button class="ca-btn ca-btn--danger ca-btn--md" id="cOk">OK</button>
+    </div>
+  </section>
 </div>
 <script src="/phone/app.js"></script>
 </body>

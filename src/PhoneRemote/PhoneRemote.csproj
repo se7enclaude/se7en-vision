@@ -13,7 +13,7 @@
     <Company>se7en</Company>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <!-- WebView2 ships a WPF assembly we do not use; its WindowsBase reference conflict is harmless. -->
     <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>
@@ -27,6 +27,7 @@
     <EmbeddedResource Include="wwwroot\**" />
     <!-- build.ps1 downloads it; embedded so the app is a single exe for Seventh Hub. -->
     <EmbeddedResource Include="..\..\tools\cloudflared.exe" LogicalName="cloudflared.exe" Condition="'$(Configuration)' == 'Release' And Exists('..\..\tools\cloudflared.exe')" />
+    <EmbeddedResource Include="..\..\tools\ffmpeg\ffmpeg.exe" LogicalName="ffmpeg.exe" Condition="'$(Configuration)' == 'Release' And Exists('..\..\tools\ffmpeg\ffmpeg.exe')" />
   </ItemGroup>
 
   <ItemGroup>

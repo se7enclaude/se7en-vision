@@ -4,10 +4,11 @@ Contrôle ton PC Windows depuis ton iPhone, de n'importe où, gratuitement.
 
 À l'ouverture, se7en Vision affiche un **QR code**, un **lien unique** et un **code à 6 chiffres**. Le lien et le code changent à chaque ouverture. Scanne le QR code, entre le code dans Safari, et tu peux :
 
-- **voir l'écran du PC** en direct, et zoomer dessus ;
+- **voir l'écran du PC** en direct, en **vidéo fluide à 30 images par seconde** (H.264, décodée par Safari depuis iOS 16.4), en plein écran en paysage, et zoomer dessus ;
 - **bouger la souris** en mode Toucher (tu touches l'écran), en mode Trackpad, ou en mode **Joystick** : un joystick sous le pouce gauche et un gros bouton « Clic » sous le pouce droit (toucher = clic gauche, deux fois = clic droit, rester appuyé = glisser) ;
 - faire un **clic gauche**, un **clic droit**, utiliser la **molette** et faire du **glisser-déposer** ;
 - **écrire au clavier**, accents compris, avec Ctrl, Alt, Maj, Windows, les flèches et des raccourcis tout prêts.
+- **verrouiller, mettre en veille, redémarrer ou éteindre le PC**, avec une confirmation à chaque fois.
 
 Ça marche en Wi-Fi comme en 4G/5G, grâce à un tunnel [Cloudflare](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/) gratuit (`*.trycloudflare.com`, sans compte).
 
@@ -37,8 +38,12 @@ Organisation du code :
 
 - `src/PhoneRemote/Server` : le serveur Kestrel (127.0.0.1 uniquement), la gestion du code PIN et de la session, et le WebSocket.
 - `src/PhoneRemote/Input` : la souris et le clavier, via `SendInput`.
-- `src/PhoneRemote/Capture` : la capture de l'écran en JPEG.
+- `src/PhoneRemote/Capture` : la capture de l'écran, en vidéo H.264 (FFmpeg) ou en images JPEG.
 - `src/PhoneRemote/Tunnel` : le lancement de cloudflared.
 - `src/PhoneRemote/wwwroot` : l'interface du PC (dans WebView2) et la page iPhone. Le design system est dans `ds/`.
 
 Pour publier une nouvelle version : change `<Version>` dans le `.csproj`, lance `build.ps1`, puis crée une release GitHub `vX.Y.Z`. Joins-y `se7en-Vision.exe` et ajoute la ligne `SHA-256 : <hash>` dans les notes de la release. Seventh Hub proposera alors la mise à jour.
+
+## Composants inclus
+
+cloudflared (Apache 2.0) et FFmpeg (GPLv3) sont inclus dans l'exe, comme programmes séparés. Voir [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) pour leurs licences et leurs sources.

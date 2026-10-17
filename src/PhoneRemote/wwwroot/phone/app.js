@@ -118,8 +118,18 @@
   // ---------- Socket ----------
   let ws = null, retryTimer = 0, pingTimer = 0, alive = false;
   const QUALITY = { fluid: { w: 960, q: 45 }, balanced: { w: 1280, q: 55 }, sharp: { w: 1920, q: 70 } };
+  const VIDEO_Q = { fluid: { w: 960, kbps: 1200 }, balanced: { w: 1280, kbps: 2500 }, sharp: { w: 1920, kbps: 5000 } };
   let quality = store.get('quality', 'balanced');
   if (!QUALITY[quality]) quality = 'balanced';
+  let imageMode = store.get('image', 'video'); // 'video' (H.264, smooth) or 'jpeg' (one image at a time)
+  let videoSupported = false;
+  const videoCheck = (async () => {
+    try {
+      videoSupported = 'VideoDecoder' in window &&
+        (await VideoDecoder.isConfigSupported({ codec: 'avc1.42E01F', optimizeForLatency: true })).supported === true;
+    } catch { videoSupported = false; }
+    renderImageMode();
+  })();
 
   function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 
@@ -141,23 +151,31 @@
     setLive(false, 'Connexion…');
     const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + base + '/ws';
     ws = new WebSocket(url);
-    ws.binaryType = 'blob';
-    ws.onopen = () => {
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = async () => {
       alive = true;
       setLive(true, '');
-      requestFrame();
+      await videoCheck;
+      startPicture();
       pingTimer = setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
     };
     ws.onmessage = (e) => {
-      if (typeof e.data !== 'string') return showFrame(e.data);
+      if (typeof e.data !== 'string') {
+        const bytes = new Uint8Array(e.data);
+        return bytes[0] === 0xFF ? showFrame(new Blob([bytes], { type: 'image/jpeg' })) : onVideoChunk(bytes);
+      }
       const m = JSON.parse(e.data);
       if (m.t === 'info') onInfo(m);
       else if (m.t === 'same') { framePending = false; setTimeout(requestFrame, m.blocked ? 1000 : 120); }
-      else if (m.t === 'pong') setLive(true, Math.round(performance.now() - m.ts) + ' ms');
+      else if (m.t === 'pong') { lastPing = Math.round(performance.now() - m.ts); renderLive(); }
+      else if (m.t === 'video' && m.state === 'error') videoFailed(m.reason);
+      else if (m.t === 'power') onPowerAck();
     };
     ws.onclose = (e) => {
       ws = null; alive = false; framePending = false;
+      resetVideo();
       clearInterval(pingTimer);
+      if (powerPending) return powerDone();
       if (e.code === 4001) return message('Accès fermé', 'Le PC a coupé l’accès. Scanne le nouveau QR code affiché sur l’écran.', { icon: 'unplug' });
       if (e.code === 4002) return message('Ouvert ailleurs', 'se7en Vision a été ouvert dans un autre onglet.', { icon: 'copy', violet: true, button: 'Reprendre ici', onButton: startControl });
       setLive(false, 'Reconnexion…');
@@ -177,6 +195,10 @@
   function setLive(on, text) {
     $('liveDot').classList.toggle('on', on);
     if (text) $('latency').textContent = text;
+  }
+  let lastPing = 0;
+  function renderLive() {
+    setLive(true, lastPing + ' ms' + (video.active && video.fps ? ' · ' + video.fps + ' i/s' : ''));
   }
 
   let screenCount = 1, screenIndex = 0;
@@ -200,7 +222,7 @@
   const shot = $('shot');
   let framePending = false, imgW = 16, imgH = 9, objectUrl = null;
   function requestFrame() {
-    if (!alive || framePending || document.hidden) return;
+    if (!alive || framePending || document.hidden || video.active) return;
     framePending = true;
     send({ t: 'frame', ...QUALITY[quality] });
   }
@@ -210,6 +232,7 @@
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       objectUrl = url;
       $('stageMsg').hidden = true;
+      if (!video.active) { shot.hidden = false; canvas.hidden = true; }
       framePending = false;
       requestFrame();
     };
@@ -217,9 +240,102 @@
     shot.src = url;
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
-    if (!$('ctrlView').hidden && (!ws || ws.readyState > 1)) connect(); else requestFrame();
+    if (document.hidden) {
+      // Don't make the PC encode video nobody is watching.
+      if (video.active) { send({ t: 'video', on: false }); resetVideo(); }
+      return;
+    }
+    if (!$('ctrlView').hidden && (!ws || ws.readyState > 1)) connect(); else startPicture();
   });
+
+  // ---------- Video (H.264 decoded by WebCodecs) ----------
+  // The PC streams one H.264 frame per message (first byte 1 = keyframe, 2 = other frame). Safari decodes
+  // them with VideoDecoder (iOS 16.4+). Without it, or if the PC can't stream, we fall back to JPEG images.
+  const canvas = $('vid');
+  const ctx2d = canvas.getContext('2d');
+  const video = { active: false, decoder: null, codec: '', waitingKey: true, ts: 0, count: 0, fps: 0, fpsAt: 0, restartAt: 0 };
+
+  function startPicture() {
+    if (!alive) return;
+    if (imageMode === 'video' && videoSupported) startVideo();
+    else { if (video.active) { send({ t: 'video', on: false }); resetVideo(); } requestFrame(); }
+  }
+  function startVideo() {
+    resetVideo();
+    video.active = true;
+    framePending = false;
+    send({ t: 'video', on: true, ...VIDEO_Q[quality] });
+  }
+  function resetVideo() {
+    video.active = false;
+    video.waitingKey = true;
+    video.codec = '';
+    if (video.decoder && video.decoder.state !== 'closed') { try { video.decoder.close(); } catch {} }
+    video.decoder = null;
+  }
+  function videoFailed(reason) {
+    console.warn('video:', reason);
+    resetVideo();
+    hint('Vidéo indisponible : images classiques');
+    requestFrame();
+  }
+  // Ask the PC for a fresh stream (it starts with a keyframe), at most once per second.
+  function requestKeyframe() {
+    const now = performance.now();
+    if (now - video.restartAt < 1000) return;
+    video.restartAt = now;
+    video.waitingKey = true;
+    send({ t: 'video', on: true, ...VIDEO_Q[quality] });
+  }
+  function spsCodec(data) {
+    for (let i = 0; i + 6 < data.length; i++) {
+      if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 1 && (data[i + 3] & 0x1F) === 7) {
+        const hex = (b) => b.toString(16).padStart(2, '0').toUpperCase();
+        return 'avc1.' + hex(data[i + 4]) + hex(data[i + 5]) + hex(data[i + 6]);
+      }
+    }
+    return null;
+  }
+  function makeDecoder(codec) {
+    if (video.decoder && video.decoder.state !== 'closed') { try { video.decoder.close(); } catch {} }
+    const decoder = new VideoDecoder({
+      output: (frame) => {
+        if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
+          canvas.width = frame.displayWidth; canvas.height = frame.displayHeight;
+        }
+        ctx2d.drawImage(frame, 0, 0);
+        frame.close();
+        if (canvas.hidden) { canvas.hidden = false; shot.hidden = true; $('stageMsg').hidden = true; }
+        video.count++;
+        const now = performance.now();
+        if (now - video.fpsAt >= 1000) { video.fps = Math.round(video.count * 1000 / (now - video.fpsAt)); video.count = 0; video.fpsAt = now; renderLive(); }
+      },
+      error: (e) => { console.warn('decoder:', e); if (video.decoder === decoder) { video.decoder = null; video.codec = ''; requestKeyframe(); } },
+    });
+    decoder.configure({ codec, optimizeForLatency: true });
+    video.decoder = decoder;
+    video.codec = codec;
+  }
+  function onVideoChunk(bytes) {
+    if (!video.active) return;
+    const key = bytes[0] === 1;
+    const data = bytes.subarray(1);
+    if (video.waitingKey && !key) return;
+    if (key) {
+      const codec = spsCodec(data) || video.codec || 'avc1.42E01F';
+      if (!video.decoder || video.decoder.state === 'closed' || codec !== video.codec) makeDecoder(codec);
+    }
+    if (!video.decoder) return;
+    // Falling behind: skip to the next keyframe instead of piling up latency.
+    if (!key && video.decoder.decodeQueueSize > 6) { requestKeyframe(); return; }
+    try {
+      video.decoder.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: (video.ts += 33333), data }));
+      video.waitingKey = false;
+    } catch (e) {
+      console.warn('decode:', e);
+      requestKeyframe();
+    }
+  }
 
   // ---------- View transform (zoom / pan of the preview) ----------
   const stage = $('stage'), frame = $('frame');
@@ -743,8 +859,63 @@
   }
   document.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => {
     quality = b.dataset.q; store.set('quality', quality); renderQuality();
+    if (video.active) startVideo();
   }));
   renderQuality();
+
+  function renderImageMode() {
+    document.querySelectorAll('[data-img]').forEach((b) => {
+      b.classList.toggle('is-active', b.dataset.img === (videoSupported ? imageMode : 'jpeg'));
+      if (b.dataset.img === 'video') b.disabled = !videoSupported;
+    });
+    $('imgHint').textContent = videoSupported
+      ? (imageMode === 'video' ? 'Vidéo fluide (30 images/s). Choisis « Images » si ta connexion est très faible.' : 'Une image à la fois : plus lent, mais marche partout.')
+      : 'La vidéo fluide demande iOS 16.4 ou plus récent : images classiques.';
+  }
+  document.querySelectorAll('[data-img]').forEach((b) => b.addEventListener('click', () => {
+    imageMode = b.dataset.img; store.set('image', imageMode); renderImageMode();
+    startPicture();
+  }));
+  renderImageMode();
+
+  // ---------- PC power actions (lock, sleep, restart, shut down) ----------
+  const POWER = {
+    lock: { title: 'Verrouiller le PC ?', text: 'L’écran de verrouillage s’affiche sur le PC. Il faudra le déverrouiller sur place.', ok: 'Verrouiller', done: null },
+    sleep: { title: 'Mettre le PC en veille ?', text: 'La connexion va s’arrêter. Réveille le PC pour reprendre.', ok: 'Mettre en veille', done: ['PC en veille', 'Réveille le PC, puis reconnecte-toi.'] },
+    restart: { title: 'Redémarrer le PC ?', text: 'Les applis ouvertes vont se fermer. se7en Vision devra être relancé sur le PC, avec un nouveau lien.', ok: 'Redémarrer', done: ['PC en redémarrage', 'Relance se7en Vision sur le PC pour obtenir un nouveau lien.'] },
+    shutdown: { title: 'Éteindre le PC ?', text: 'Les applis ouvertes vont se fermer et le lien ne marchera plus.', ok: 'Éteindre', done: ['Extinction demandée', 'Le PC s’éteint. Si une appli demande d’enregistrer, il attend une réponse sur son écran.'] },
+  };
+  let powerPending = null;
+  function askConfirm({ title, text, ok }, onOk) {
+    $('cTitle').textContent = title;
+    $('cText').textContent = text;
+    $('cOk').textContent = ok;
+    $('cOk').onclick = () => { closeConfirm(); onOk(); };
+    $('confirmDlg').hidden = false; $('confirmScrim').hidden = false;
+  }
+  function closeConfirm() { $('confirmDlg').hidden = true; $('confirmScrim').hidden = true; }
+  $('cCancel').addEventListener('click', closeConfirm);
+  $('confirmScrim').addEventListener('click', closeConfirm);
+  document.querySelectorAll('[data-power]').forEach((b) => b.addEventListener('click', () => {
+    const a = b.dataset.power;
+    closeSheet();
+    askConfirm(POWER[a], () => {
+      powerPending = a;
+      if (holdLock) toggleHold();
+      send({ t: 'power', a });
+      setTimeout(() => { if (powerPending === a) powerDone(); }, 4000);
+    });
+  }));
+  function onPowerAck() {
+    if (powerPending === 'lock') { powerPending = null; hint('PC verrouillé'); }
+  }
+  function powerDone() {
+    const a = powerPending;
+    powerPending = null;
+    const d = a && POWER[a].done;
+    if (!d) { if (!$('ctrlView').hidden && !ws) retryTimer = setTimeout(reconnect, 1500); return; }
+    message(d[0], d[1], { icon: a === 'sleep' ? 'moon' : 'power', violet: true, button: 'Se reconnecter', onButton: boot });
+  }
   $('speed').value = store.get('speed', '1.4');
   $('speed').addEventListener('change', () => store.set('speed', $('speed').value));
   $('leaveBtn').addEventListener('click', () => {
