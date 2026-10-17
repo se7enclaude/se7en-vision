@@ -172,17 +172,6 @@ h1 { font: var(--type-h1); font-size: 28px; letter-spacing: var(--ls-heading); m
 .tool:active { transform: scale(.94); }
 .tool.on { background: linear-gradient(180deg, var(--violet-400), var(--violet-500)); color: #fff; box-shadow: var(--shadow-accent); }
 
-/* Landscape: toolbar moves to the side so the screen gets the height. */
-@media (orientation: landscape) and (max-height: 520px) {
-  .control { display: grid; grid-template-columns: 1fr 210px; grid-template-rows: auto 1fr auto; gap: 8px; }
-  .bar { grid-column: 2; grid-row: 1; }
-  .stage { grid-column: 1; grid-row: 1 / span 3; }
-  .keys { grid-column: 2; grid-row: 2; align-self: end; }
-  .keys-row { flex-wrap: wrap; overflow: visible; }
-  .toolbar { grid-column: 2; grid-row: 3; }
-  .tools { grid-template-columns: repeat(2, 1fr); }
-  .tool { height: 46px; }
-}
 
 /* Sheet */
 .scrim { position: fixed; inset: 0; background: var(--scrim); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); z-index: 20; animation: ca-fade var(--dur-base) var(--ease-out); }
@@ -295,21 +284,79 @@ h1 { font: var(--type-h1); font-size: 28px; letter-spacing: var(--ls-heading); m
 .control.joy .tools { display: none; }
 .control.joy .wheel { display: none; }
 
-/* Joystick in landscape: stick on the left, buttons on the right, screen in the middle. */
-@media (orientation: landscape) and (max-height: 520px) {
-  .control.joy { grid-template-columns: 170px 1fr 200px; grid-template-rows: auto 1fr auto; }
-  .control.joy .bar { grid-column: 3; grid-row: 1; }
-  .control.joy .stage { grid-column: 2; grid-row: 1 / span 3; }
-  .control.joy .toolbar { grid-column: 3; grid-row: 3; }
-  .control.joy .keys { grid-column: 2; grid-row: 3; align-self: end; z-index: 2; }
-  .control.joy .joypad { display: contents; }
-  .control.joy .joy-zone { grid-column: 1; grid-row: 1 / span 3; }
-  .control.joy .joy-scroll { display: none; }
-  .control.joy .joy-buttons { grid-column: 3; grid-row: 2; align-self: center; justify-self: center; transform: scale(.9); }
-}
 
 /* Landscape: the three mode tabs show their icons only. */
 @media (orientation: landscape) and (max-height: 520px) {
   .mode .ca-seg__item { font-size: 0; gap: 0; }
   .mode .ca-seg__item .ca-icon { font-size: 17px; }
+}
+
+/* ---------- Landscape: the PC screen fills the whole phone, controls float on top ---------- */
+.panel-btn { display: none; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .app:has(.control:not([hidden])) { padding: 0; }
+  .control { position: relative; display: block; }
+  .stage {
+    position: absolute; inset: 0;
+    border-radius: 0; box-shadow: none; background: #000;
+  }
+  .stage.pad .frame { opacity: .8; }
+
+  /* Small status pill, top right */
+  .bar {
+    position: absolute; z-index: 5;
+    top: max(6px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right));
+    height: 40px; padding: 0 4px 0 12px; gap: 6px;
+    background: rgba(20,20,22,.55); color: #fff; border-color: rgba(255,255,255,.14);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  }
+  .bar-title { display: none; }
+  .bar-sub { color: rgba(255,255,255,.7); margin: 0; }
+  .bar .ib { width: 32px; height: 32px; font-size: 15px; }
+  .panel-btn { display: inline-flex; }
+
+  /* Toolbar: hidden until the panel button is tapped, then floats at the bottom */
+  .toolbar {
+    position: absolute; z-index: 5; display: none;
+    left: 50%; transform: translateX(-50%);
+    bottom: max(6px, env(safe-area-inset-bottom));
+    width: min(520px, 70%); flex-direction: row; align-items: center; gap: 8px;
+    padding: 6px; border-radius: 22px;
+    background: rgba(20,20,22,.6); border-color: rgba(255,255,255,.14);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    animation: ca-fade var(--dur-base) var(--ease-out);
+  }
+  .control.show-tools .toolbar { display: flex; }
+  .mode { width: auto; flex: none; }
+  .mode .ca-seg__item { font-size: 0; gap: 0; padding: 0 12px; }
+  .mode .ca-seg__item .ca-icon { font-size: 17px; }
+  .tools { flex: 1; grid-template-columns: repeat(4, 1fr); }
+  .tool { height: 42px; flex-direction: row; gap: 5px; background: rgba(255,255,255,.14); color: #fff; box-shadow: none; }
+  .tool .ca-icon { font-size: 17px; }
+  .tool span { display: none; }
+
+  .keys {
+    position: absolute; z-index: 6; left: 50%; transform: translateX(-50%);
+    bottom: max(6px, env(safe-area-inset-bottom)); width: min(640px, 80%);
+  }
+  .control.show-tools .keys { bottom: calc(max(6px, env(safe-area-inset-bottom)) + 62px); }
+  .wheel { right: max(6px, env(safe-area-inset-right)); top: 56%; height: 45%; }
+
+  /* Joystick: stick bottom-left, buttons bottom-right, both see-through over the screen */
+  .control.joy .joypad { display: contents; }
+  .control.joy .joy-scroll { display: none; }
+  .control.joy .toolbar { width: auto; }
+  .control.joy .joy-zone {
+    position: absolute; z-index: 4;
+    left: max(0px, env(safe-area-inset-left)); bottom: 0;
+    width: 34%; max-width: 260px; height: 75%;
+  }
+  .control.joy .joy-base { left: 50%; top: 62%; opacity: .78; }
+  .control.joy .joy-zone.active .joy-base { opacity: .95; }
+  .control.joy .joy-buttons {
+    position: absolute; z-index: 4;
+    right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom));
+    transform: scale(.88); transform-origin: 100% 100%; opacity: .9;
+  }
+  .control.joy.show-tools .joy-buttons { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 60px); }
 }

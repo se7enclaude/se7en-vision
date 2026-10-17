@@ -34,7 +34,11 @@ Mode Joystick (téléphone en portrait, comme une manette)
   - Rester appuyé sur « Clic » + joystick : glisser-déposer
   - Droit, Double, Maintenir, Clavier : autour du bouton « Clic »
   - Bande « Molette » au milieu : défiler
-  - En paysage : joystick à gauche, boutons à droite, écran au milieu
+  - En paysage : l'écran prend tout le téléphone, joystick et boutons par-dessus
+
+En paysage
+  - L'écran du PC prend tout le téléphone
+  - Bouton en haut à droite (à côté des réglages) : afficher / cacher la barre des commandes
 
 Toujours disponibles
   - Bande à droite de l'aperçu : molette

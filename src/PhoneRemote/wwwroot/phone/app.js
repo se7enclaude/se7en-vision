@@ -722,6 +722,12 @@
     if (map[e.key]) { e.preventDefault(); sendKey(map[e.key]); }
   });
 
+  // ---------- Landscape: show / hide the floating toolbar ----------
+  $('panelBtn').addEventListener('click', () => {
+    const on = $('ctrlView').classList.toggle('show-tools');
+    $('panelBtn').classList.toggle('is-active', on);
+  });
+
   // ---------- Sheet ----------
   function openSheet() { $('sheet').hidden = false; $('scrim').hidden = false; }
   function closeSheet() { $('sheet').hidden = true; $('scrim').hidden = true; }
