@@ -2,7 +2,7 @@
 
 Contrôle ton PC Windows depuis ton iPhone, de n'importe où, gratuitement.
 
-À l'ouverture, se7en Vision affiche un **QR code**, un **lien unique** et un **code à 6 chiffres**. Le lien et le code changent à chaque ouverture. Scanne le QR code, entre le code dans Safari, et tu peux :
+À l'ouverture, se7en Vision affiche un **QR code**, un **lien unique** et **ton code à 6 chiffres**. Scanne le QR code : tu es connecté tout de suite, sans rien taper. Avec le lien copié, il faut entrer ton code. Ensuite, tu peux :
 
 - **voir l'écran du PC** en direct, en **vidéo fluide à 30 images par seconde** (H.264, décodée par Safari depuis iOS 16.4), en plein écran en paysage, et zoomer dessus ;
 - **bouger la souris** en mode Toucher (tu touches l'écran), en mode Trackpad, ou en mode **Joystick** : un joystick sous le pouce gauche et un gros bouton « Clic » sous le pouce droit (toucher = clic gauche, deux fois = clic droit, rester appuyé = glisser) ;
@@ -21,7 +21,8 @@ Windows peut afficher un avertissement SmartScreen, parce que l'exécutable n'es
 ## Sécurité
 
 - Le lien contient un jeton aléatoire de 128 bits. Toute autre adresse renvoie une erreur 404.
-- Le code PIN s'affiche uniquement sur l'écran du PC. Au bout de 5 codes faux, le lien est désactivé et un nouveau lien est créé.
+- Le lien change à chaque ouverture. Le code à 6 chiffres est celui que tu choisis (« Choisir mon code ») : il est gardé d'une ouverture à l'autre, chiffré avec Windows (DPAPI). Les codes trop faciles (000000, 123456…) sont refusés. Au bout de 5 codes faux, le lien est désactivé et un nouveau lien est créé.
+- Le QR code contient une clé secrète à usage unique (dans la partie `#` de l'adresse, jamais envoyée dans les journaux) : elle connecte sans code, puis un nouveau QR code s'affiche. Le lien copié ne contient pas cette clé.
 - Un seul téléphone peut se connecter à la fois. Le bouton « Déconnecter » coupe l'accès immédiatement.
 - Quand tu fermes l'appli, le tunnel est coupé et le lien ne fonctionne plus.
 
