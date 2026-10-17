@@ -133,6 +133,25 @@ h1 { font: var(--type-h1); font-size: 28px; letter-spacing: var(--ls-heading); m
 }
 .hint-chip.show { opacity: 1; }
 
+/* Astuce Safari : masquer la barre d'outils (affichée une fois) */
+.safari-tip {
+  position: absolute; left: 10px; right: 10px; top: 10px; z-index: 5;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 12px 12px 14px; border-radius: var(--radius-md);
+  background: rgba(20,20,22,.88); color: #fff;
+  border: 1px solid rgba(255,255,255,.16);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  animation: tip-in var(--dur-base) var(--ease-out);
+}
+.safari-tip__icon { font-size: 20px; color: var(--violet-300, #b7a9ff); flex: none; }
+.safari-tip__text { display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.35; min-width: 0; }
+.safari-tip__text strong { font-size: 14px; font-weight: 600; }
+.safari-tip__text span { color: rgba(255,255,255,.78); }
+.safari-tip__text b { color: #fff; font-weight: 600; }
+.safari-tip .ca-btn { flex: none; }
+@keyframes tip-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
 /* Keyboard panel */
 .keys { flex: none; padding: 8px; border-radius: var(--radius-lg); position: relative; }
 .keys-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }

@@ -13,7 +13,7 @@
     <Company>se7en</Company>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <!-- WebView2 ships a WPF assembly we do not use; its WindowsBase reference conflict is harmless. -->
     <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>

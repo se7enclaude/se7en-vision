@@ -168,7 +168,21 @@
     show('ctrlView');
     requestAnimationFrame(layoutFrame);
     connect();
+    showSafariTip();
   }
+
+  // ---------- Astuce : masquer la barre de Safari (un site ne peut pas le faire lui-même) ----------
+  const tip = $('safariTip');
+  function showSafariTip() {
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!ios || navigator.standalone === true || store.get('safari-tip', '') === 'vu') return;
+    tip.hidden = false;
+  }
+  // Les touches sur l'astuce ne doivent pas piloter la souris du PC.
+  ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchmove', 'touchend', 'mousedown', 'click', 'wheel']
+    .forEach((ev) => tip.addEventListener(ev, (e) => e.stopPropagation()));
+  $('safariTipOk').addEventListener('click', () => { tip.hidden = true; store.set('safari-tip', 'vu'); });
 
   function connect() {
     stopSocket();
