@@ -95,11 +95,12 @@ public sealed class MainForm : Form
 
     private void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
-        string type;
+        string type, pin = "";
         try
         {
             using var doc = JsonDocument.Parse(e.WebMessageAsJson);
             type = doc.RootElement.GetProperty("type").GetString() ?? "";
+            if (doc.RootElement.TryGetProperty("pin", out var p)) pin = p.GetString() ?? "";
         }
         catch { return; }
 
@@ -117,6 +118,10 @@ public sealed class MainForm : Form
                 break;
             case "retryTunnel":
                 _tunnel.Start();
+                break;
+            case "setPin":
+                var error = _session.SetPersonalPin(pin);
+                _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new { type = "pinSaved", ok = error == null, error }));
                 break;
             case "copy":
                 var url = CurrentLink();
@@ -138,10 +143,11 @@ public sealed class MainForm : Form
         WriteDebugFile();
         if (!_webReady) return;
         var link = CurrentLink();
-        if (link != _qrFor)
+        var qrLink = link == null ? null : link + "#k=" + _session.QrKey;
+        if (qrLink != _qrFor)
         {
-            _qrFor = link;
-            _qrSvg = link == null ? null : Qr(link);
+            _qrFor = qrLink;
+            _qrSvg = qrLink == null ? null : Qr(qrLink);
         }
 
         var state = new
@@ -149,7 +155,9 @@ public sealed class MainForm : Form
             type = "state",
             link,
             qr = _qrSvg,
+            qrFor = _qrFor,
             pin = _session.Pin,
+            pinPersonal = _session.PinIsPersonal,
             tunnel = _tunnel.State.ToString().ToLowerInvariant(),
             tunnelError = _tunnel.Error,
             phone = _session.PhoneConnected,
@@ -176,6 +184,6 @@ public sealed class MainForm : Form
         var dir = AppInfo.DataDir;
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "debug.txt"),
-            $"local=http://127.0.0.1:{_server.Port}/s/{_session.Token}\npin={_session.Pin}\npublic={CurrentLink()}\ntunnel={_tunnel.State} {_tunnel.Error}\n");
+            $"local=http://127.0.0.1:{_server.Port}/s/{_session.Token}\npin={_session.Pin}\nqrkey={_session.QrKey}\npublic={CurrentLink()}\ntunnel={_tunnel.State} {_tunnel.Error}\n");
     }
 }

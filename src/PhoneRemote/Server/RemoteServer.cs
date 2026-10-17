@@ -79,25 +79,17 @@ public sealed class RemoteServer : IAsyncDisposable
             PinRequest? req = null;
             try { req = await JsonSerializer.DeserializeAsync(ctx.Request.Body, AppJson.Default.PinRequest); }
             catch (JsonException) { }
+            return await Open(ctx, token, _session.TryPin(req?.Pin ?? "", out var sessionId), sessionId);
+        });
 
-            var result = _session.TryPin(req?.Pin ?? "", out var sessionId);
-            if (result == PinResult.Ok)
-            {
-                ctx.Response.Cookies.Append(CookieName, sessionId!, new CookieOptions
-                {
-                    HttpOnly = true,
-                    SameSite = SameSiteMode.Strict,
-                    Secure = ctx.Request.Headers["X-Forwarded-Proto"] == "https",
-                    Path = "/s/" + token,
-                    IsEssential = true,
-                });
-            }
-            else
-            {
-                await Task.Delay(600); // slow down guessing
-            }
-            int left = Math.Max(0, SessionManager.MaxAttempts - _session.FailedAttempts);
-            return Results.Json(new PinResponse(result.ToString().ToLowerInvariant(), left), AppJson.Default.PinResponse);
+        // QR code : la clé à usage unique du QR remplace le code (connexion sans rien taper)
+        app.MapPost("/s/{token}/qr", async (HttpContext ctx, string token) =>
+        {
+            if (!_session.IsToken(token)) return Results.NotFound();
+            QrRequest? req = null;
+            try { req = await JsonSerializer.DeserializeAsync(ctx.Request.Body, AppJson.Default.QrRequest); }
+            catch (JsonException) { }
+            return await Open(ctx, token, _session.TryQrKey(req?.Key ?? "", out var sessionId), sessionId);
         });
 
         app.Map("/s/{token}/ws", async (HttpContext ctx, string token) =>
@@ -117,6 +109,28 @@ public sealed class RemoteServer : IAsyncDisposable
         await app.StartAsync();
         _app = app;
         Port = new Uri(app.Urls.First()).Port;
+    }
+
+    /// <summary>After a PIN or a QR key: sets the session cookie when it is right, otherwise slows down guessing.</summary>
+    private async Task<IResult> Open(HttpContext ctx, string token, PinResult result, string? sessionId)
+    {
+        if (result == PinResult.Ok)
+        {
+            ctx.Response.Cookies.Append(CookieName, sessionId!, new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Strict,
+                Secure = ctx.Request.Headers["X-Forwarded-Proto"] == "https",
+                Path = "/s/" + token,
+                IsEssential = true,
+            });
+        }
+        else
+        {
+            await Task.Delay(600); // slow down guessing
+        }
+        int left = Math.Max(0, SessionManager.MaxAttempts - _session.FailedAttempts);
+        return Results.Json(new PinResponse(result.ToString().ToLowerInvariant(), left), AppJson.Default.PinResponse);
     }
 
     private IResult ServeFile(HttpContext ctx, string name, int status)
@@ -174,11 +188,13 @@ public sealed class RemoteServer : IAsyncDisposable
 }
 
 public sealed record PinRequest(string? Pin);
+public sealed record QrRequest(string? Key);
 public sealed record PinResponse(string Result, int AttemptsLeft);
 public sealed record MeResponse(bool Authed);
 
 [System.Text.Json.Serialization.JsonSourceGenerationOptions(PropertyNamingPolicy = System.Text.Json.Serialization.JsonKnownNamingPolicy.CamelCase)]
 [System.Text.Json.Serialization.JsonSerializable(typeof(PinRequest))]
+[System.Text.Json.Serialization.JsonSerializable(typeof(QrRequest))]
 [System.Text.Json.Serialization.JsonSerializable(typeof(PinResponse))]
 [System.Text.Json.Serialization.JsonSerializable(typeof(MeResponse))]
 internal partial class AppJson : System.Text.Json.Serialization.JsonSerializerContext;

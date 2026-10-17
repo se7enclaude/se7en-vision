@@ -41,12 +41,22 @@
     <section class="side">
       <div>
         <h1>Contrôle ce PC depuis ton téléphone</h1>
-        <p class="sub">Scanne le QR code avec l'appareil photo de ton iPhone, puis entre le code ci-dessous.</p>
+        <p class="sub">Scanne le QR code avec l'appareil photo de ton iPhone : tu es connecté tout de suite, sans rien taper. Avec le lien copié, il faudra ton code.</p>
       </div>
 
       <div class="ca-tile pin-tile">
-        <span class="caps">Code</span>
+        <div class="pin-head">
+          <span class="caps">Ton code</span>
+          <button class="ca-btn ca-btn--ghost ca-btn--sm" id="editPinBtn"><i class="ca-icon icon-pencil"></i>Choisir mon code</button>
+        </div>
         <div class="pin mono" id="pin">––– –––</div>
+        <form class="pin-edit" id="pinEdit" hidden>
+          <label class="ca-field ca-field--well ca-field--md">
+            <input class="ca-field__input mono" id="pinField" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 chiffres" aria-label="Nouveau code à 6 chiffres">
+          </label>
+          <button class="ca-btn ca-btn--primary ca-btn--md" type="submit" id="pinSave"><i class="ca-icon icon-check"></i>Enregistrer</button>
+          <button class="ca-btn ca-btn--ghost ca-btn--md" type="button" id="pinCancel">Annuler</button>
+        </form>
         <span class="hint" id="pinHint">Ne le donne qu'à la personne qui contrôle ce PC.</span>
       </div>
 
@@ -54,7 +64,7 @@
         <span class="well" id="statusWell"><i class="ca-icon icon-smartphone" id="statusIcon"></i></span>
         <div class="status-text">
           <div class="status-title" id="statusTitle">En attente du téléphone</div>
-          <div class="status-desc" id="statusDesc">Le lien et le code changent à chaque ouverture.</div>
+          <div class="status-desc" id="statusDesc">Le lien change à chaque ouverture, ton code reste le même.</div>
         </div>
       </div>
 

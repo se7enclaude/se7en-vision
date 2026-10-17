@@ -82,6 +82,11 @@ h1 { font: var(--type-h1); letter-spacing: var(--ls-heading); margin: 6px 0 6px;
 .sub { margin: 0; color: var(--text-secondary); max-width: 46ch; }
 
 .pin-tile { padding: var(--pad-tile) 22px; display: flex; flex-direction: column; gap: 6px; }
+.pin-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pin-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.pin-edit .ca-field { width: 180px; }
+.pin-edit .ca-field__input { font-size: 22px; letter-spacing: .2em; }
+.pin-edit .ca-field__input::placeholder { font-size: 15px; letter-spacing: 0; }
 .pin {
   font-size: 56px; font-weight: 500; line-height: 1.05; letter-spacing: .06em;
   background: linear-gradient(180deg, var(--violet-500), var(--violet-700));

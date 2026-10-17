@@ -2,6 +2,9 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const base = location.pathname.replace(/\/+$/, '');
+  // Clé du QR code (#k=…) : connexion sans taper le code. Retirée de l'adresse tout de suite (usage unique).
+  let qrKey = (/[#&]k=([0-9a-f]{16,64})/.exec(location.hash) || [])[1] || '';
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   const store = {
     get(k, d) { try { const v = localStorage.getItem('vision-' + k); return v == null ? d : v; } catch { return d; } },
     set(k, v) { try { localStorage.setItem('vision-' + k, v); } catch {} },
@@ -54,7 +57,28 @@
     if (res.status === 404) return expired();
     if (!res.ok) return message('PC injoignable', 'se7en Vision est peut-être fermé sur le PC.', { icon: 'wifi-off', button: 'Réessayer', onButton: boot });
     const me = await res.json();
-    if (me.authed) startControl(); else showPin();
+    if (me.authed) return startControl();
+    if (qrKey && await tryQrKey()) return;
+    showPin();
+  }
+
+  async function tryQrKey() {
+    const key = qrKey;
+    qrKey = '';
+    try {
+      const res = await fetch(base + '/qr', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      if (!res.ok) return false;
+      const r = await res.json();
+      if (r.result === 'ok') { startControl(); return true; }
+      if (r.result === 'busy') {
+        message('Déjà utilisé', 'Un autre appareil contrôle ce PC en ce moment.', { icon: 'smartphone', button: 'Réessayer', onButton: boot });
+        return true;
+      }
+      return false; // QR déjà utilisé : on demande le code
+    } catch { return false; }
   }
 
   // ---------- PIN ----------
