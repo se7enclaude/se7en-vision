@@ -1,4 +1,5 @@
 using PhoneRemote.Server;
+using PhoneRemote.Tools;
 using PhoneRemote.Tunnel;
 
 namespace PhoneRemote;
@@ -17,8 +18,17 @@ internal static class Program
 
         ApplicationConfiguration.Initialize();
 
+        // Unexpected error: let go of every key/button the phone held, log it, tell the user.
+        RemoteServer? running = null;
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => OnCrash(e.Exception, running, fatal: false);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => OnCrash(e.ExceptionObject as Exception, running, fatal: e.IsTerminating);
+        TaskScheduler.UnobservedTaskException += (_, e) => { e.SetObserved(); Log.Error("tâche", e.Exception); };
+        Log.Write($"Démarrage v{Application.ProductVersion}");
+
         var session = new SessionManager();
         var server = new RemoteServer(session);
+        running = server;
         try
         {
             server.StartAsync().GetAwaiter().GetResult();
@@ -37,5 +47,26 @@ internal static class Program
 
         tunnel.Dispose();
         server.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        Log.Write("Fermeture");
+    }
+
+    private static int _crashing;
+
+    private static void OnCrash(Exception? ex, RemoteServer? server, bool fatal)
+    {
+        try { server?.ReleaseInput(); } catch { }
+        Log.Error(fatal ? "fatale" : "inattendue", ex);
+        if (Interlocked.Exchange(ref _crashing, 1) == 1) return; // one message at a time
+        try
+        {
+            MessageBox.Show(
+                (fatal ? "se7en Vision a rencontré une erreur et va se fermer." : "se7en Vision a rencontré une erreur.")
+                + "\n\nPlus aucune touche ni aucun clic n'est tenu."
+                + (ex is null ? "" : "\n\n" + ex.Message)
+                + "\n\nDétails : " + Log.FilePath,
+                AppInfo.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        catch { }
+        finally { Interlocked.Exchange(ref _crashing, 0); }
     }
 }

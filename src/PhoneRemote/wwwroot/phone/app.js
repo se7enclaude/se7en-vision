@@ -291,7 +291,7 @@
   // them with VideoDecoder (iOS 16.4+). Without it, or if the PC can't stream, we fall back to JPEG images.
   const canvas = $('vid');
   const ctx2d = canvas.getContext('2d');
-  const video = { active: false, decoder: null, codec: '', waitingKey: true, ts: 0, count: 0, fps: 0, fpsAt: 0, restartAt: 0 };
+  const video = { active: false, decoder: null, codec: '', waitingKey: true, ts: 0, count: 0, fps: 0, fpsAt: 0, restartAt: 0, retryTimer: 0, retryDelay: 2000 };
 
   function startPicture() {
     if (!alive) return;
@@ -299,6 +299,7 @@
     else { if (video.active) { send({ t: 'video', on: false }); resetVideo(); } requestFrame(); }
   }
   function startVideo() {
+    clearTimeout(video.retryTimer); video.retryTimer = 0;
     resetVideo();
     video.active = true;
     framePending = false;
@@ -314,16 +315,25 @@
   function videoFailed(reason) {
     console.warn('video:', reason);
     resetVideo();
-    hint('Vidéo indisponible : images classiques');
+    // Images for now; the video comes back on its own once the PC can stream again (lock screen, UAC
+    // prompt…): new try after 2 s, 4 s, 8 s… up to 30 s.
+    const delay = video.retryDelay;
+    video.retryDelay = Math.min(30000, delay * 2);
+    if (delay === 2000) hint('Vidéo indisponible : images classiques');
+    clearTimeout(video.retryTimer);
+    video.retryTimer = setTimeout(() => {
+      video.retryTimer = 0;
+      if (alive && !document.hidden && imageMode === 'video' && videoSupported && !video.active) startVideo();
+    }, delay);
     requestFrame();
   }
-  // Ask the PC for a fresh stream (it starts with a keyframe), at most once per second.
+  // Skip to the next keyframe (the PC sends one every second) without restarting the stream, at most once per second.
   function requestKeyframe() {
     const now = performance.now();
     if (now - video.restartAt < 1000) return;
     video.restartAt = now;
     video.waitingKey = true;
-    send({ t: 'video', on: true, ...VIDEO_Q[quality] });
+    send({ t: 'keyframe' });
   }
   function spsCodec(data) {
     for (let i = 0; i + 6 < data.length; i++) {
@@ -343,6 +353,7 @@
         }
         ctx2d.drawImage(frame, 0, 0);
         frame.close();
+        video.retryDelay = 2000; // the video works again: next failure retries quickly
         if (canvas.hidden) { canvas.hidden = false; shot.hidden = true; $('stageMsg').hidden = true; }
         video.count++;
         const now = performance.now();

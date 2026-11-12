@@ -9,6 +9,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using PhoneRemote.Capture;
 using PhoneRemote.Input;
+using PhoneRemote.Tools;
 
 namespace PhoneRemote.Server;
 
@@ -34,6 +35,19 @@ public sealed class RemoteServer : IAsyncDisposable
         _session = session;
         _phoneFiles = new ManifestEmbeddedFileProvider(typeof(RemoteServer).Assembly, "wwwroot/phone");
         _session.SessionRevoked += () => _current?.Close(4001, "revoked");
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        Log.Write("Écrans modifiés : capture relancée");
+        _current?.DisplayChanged();
+    }
+
+    /// <summary>Releases every key and button the phone may still hold (crash, phone gone).</summary>
+    public void ReleaseInput()
+    {
+        lock (_input) _input.ReleaseAll();
     }
 
     public async Task StartAsync()
@@ -43,7 +57,9 @@ public sealed class RemoteServer : IAsyncDisposable
         builder.Logging.ClearProviders();
         var app = builder.Build();
 
-        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
+        // Pings answered by the browser itself: a connection whose phone vanished is cut after 15 s even if
+        // the page stopped talking (the page's own pings are watched in PhoneConnection, 10 s).
+        app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(5), KeepAliveTimeout = TimeSpan.FromSeconds(15) });
         app.Use(async (ctx, next) =>
         {
             var h = ctx.Response.Headers;
@@ -154,18 +170,29 @@ public sealed class RemoteServer : IAsyncDisposable
     {
         var conn = new PhoneConnection(ws, _input, _capturer);
         var previous = Interlocked.Exchange(ref _current, conn);
-        previous?.Close(4002, "replaced");
+        if (previous != null)
+        {
+            // the old connection stops driving the PC right away; whatever it held is let go
+            previous.Close(4002, "replaced");
+            ReleaseInput();
+        }
         _session.SetConnected(true, DeviceName(userAgent));
+        Log.Write($"Téléphone connecté ({DeviceName(userAgent)})");
         try
         {
             await conn.RunAsync(aborted);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("connexion", ex);
         }
         finally
         {
             if (Interlocked.CompareExchange(ref _current, null, conn) == conn)
             {
-                lock (_input) _input.ReleaseAll();
+                ReleaseInput();
                 if (_session.PhoneConnected) _session.SetConnected(false);
+                Log.Write("Téléphone déconnecté");
             }
         }
     }
@@ -177,6 +204,7 @@ public sealed class RemoteServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _current?.Close(1001, "closing");
         if (_app != null)
         {

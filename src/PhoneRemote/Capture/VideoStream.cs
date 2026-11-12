@@ -44,7 +44,7 @@ public sealed class VideoStream : IDisposable
             "-video_size", $"{screen.Width}x{screen.Height}", "-i", "desktop",
             "-vf", $"scale={width}:-2:flags=bilinear,format=yuv420p",
             "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
-            "-profile:v", "baseline", "-bf", "0", "-g", (fps * 2).ToString(),
+            "-profile:v", "baseline", "-bf", "0", "-g", fps.ToString(), // a keyframe every second
             "-b:v", $"{kbps}k", "-maxrate", $"{kbps}k", "-bufsize", $"{kbps / 2}k",
             "-x264-params", "aud=1:repeat-headers=1",
             "-flush_packets", "1", "-f", "h264", "-",
