@@ -129,6 +129,7 @@ public sealed class ViewerConnection
             StopVideo();
             _video.Dispose();
             CursorOff();
+            _host.Overlay?.Clear();
             PeerSession? rtc; lock (_videoGate) { rtc = _rtc; _rtc = null; }
             rtc?.Dispose();
             try { await dcPump; } catch { }
@@ -241,6 +242,9 @@ public sealed class ViewerConnection
                 // The viewer fell behind or lost its decoder: resume at the next keyframe.
                 _sink?.DropUntilKey();
                 _video.RequestKeyframe();
+                break;
+            case "draw":
+                HandleDraw(m);
                 break;
             case "curreq":
             {
@@ -567,7 +571,8 @@ public sealed class ViewerConnection
                 screens = screens.Select(x => new { i = x.Index, x = x.X, y = x.Y, w = x.W, h = x.H, hz = x.Hz, primary = x.Primary, name = x.Name }),
                 mosaic = _mosaic ? MosaicInfo(screens) : null,
                 enc = enc == null ? null : new { id = enc.Id, codec = Protocol.CodecName(enc.Codec), gpu = enc.Gpu, maxFps = Math.Min(enc.MaxFps, s.FpsCap) },
-                features = s.Rtc ? new[] { "stat", "cur", "kd", "rtc" } : new[] { "stat", "cur", "kd" },
+                features = Features(s),
+                overlayExcluded = _host.Overlay?.ExcludedFromCapture ?? false,
                 quality = QualityPlanner.ModeName(_mode),
                 probing = !_host.Probe.Done,
             };
@@ -656,6 +661,39 @@ public sealed class ViewerConnection
 
     /// <summary>Binary from a data channel (file chunks, later).</summary>
     private Task HandleBinary(byte[] data, CancellationToken ct) => Task.CompletedTask;
+
+    private string[] Features(Settings.AppSettings s)
+    {
+        var f = new List<string> { "stat", "cur", "kd" };
+        if (s.Rtc) f.Add("rtc");
+        if (_host.Overlay != null) f.Add("draw");
+        return f.ToArray();
+    }
+
+    /// <summary>Laser dot and pen strokes: fractions of a screen, drawn by the overlay window.</summary>
+    private void HandleDraw(JsonElement m)
+    {
+        var o = _host.Overlay;
+        if (o == null || _closing) return;
+        int screen = Json.Int(m, "s", _screen);
+        if (screen < 0 || screen >= Displays.All().Length) screen = _screen;
+        switch (Json.Str(m, "op"))
+        {
+            case "laser": o.Laser(Json.Num(m, "x"), Json.Num(m, "y"), screen, Json.Str(m, "c", "")); break;
+            case "begin": o.Begin(Json.Int(m, "id", 0), Json.Num(m, "x"), Json.Num(m, "y"), screen, Json.Str(m, "c", ""), Json.Num(m, "w", 4)); break;
+            case "pts":
+            {
+                if (!m.TryGetProperty("p", out var arr) || arr.ValueKind != JsonValueKind.Array) break;
+                var xy = new List<double>();
+                foreach (var v in arr.EnumerateArray()) { if (v.ValueKind == JsonValueKind.Number && xy.Count < 4000) xy.Add(v.GetDouble()); }
+                o.Points(Json.Int(m, "id", 0), xy.ToArray());
+                break;
+            }
+            case "end": o.End(Json.Int(m, "id", 0)); break;
+            case "undo": o.Undo(); break;
+            case "clear": o.Clear(); break;
+        }
+    }
 
     private static object MosaicInfo(ScreenInfo[] screens)
     {

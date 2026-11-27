@@ -12,6 +12,8 @@ public sealed class HostServices
     public InputInjector Input { get; } = new();
     public ScreenCapturer Capturer { get; } = new();
     public CursorTracker Cursor { get; } = new();
+    /// <summary>Laser and pen on this PC's screens; created by the main window (needs its message loop).</summary>
+    public Overlay.AnnotationOverlay? Overlay { get; set; }
     public EncoderProbe Probe { get; }
     public AppSettings Settings { get; set; }
 

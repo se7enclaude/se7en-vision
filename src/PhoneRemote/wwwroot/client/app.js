@@ -10,6 +10,7 @@ import { createCursor } from './cursor.js';
 import { createStats } from './stats.js';
 import { createInput } from './input.js';
 import { createRtc, rtcPossible } from './rtc.js';
+import { createDraw } from './draw.js';
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.replace(/\/+$/, '');
@@ -210,6 +211,9 @@ const input = createInput({
   getScreen: () => (info ? info.screen : 0),
 });
 
+const draw = createDraw({ stage, canvas: $('drawLayer'), layout, send, input, hint, store, getScreens: () => (info && info.screens) || null });
+draw.screenIndex = () => (info ? info.screen : 0);
+
 function startControl() {
   show('ctrlView');
   requestAnimationFrame(() => layout.layout());
@@ -222,6 +226,8 @@ function connect() {
   ws.connect();
 }
 function stopSession() {
+  draw.clearAll();
+  if (draw.tool) draw.setTool(draw.tool);
   ws.stop();
   rtc.stop();
   via = 'ws'; transport.mode = 'ws'; stats.mode = 'ws';
@@ -305,6 +311,8 @@ function onInfo(m) {
   renderQuality();
   renderScreens(m);
   cursor.enabled = hostV2 && Array.isArray(m.features) && m.features.includes('cur');
+  draw.available = hostV2 && Array.isArray(m.features) && m.features.includes('draw');
+  draw.echo = !!m.overlayExcluded;
   $('rtcToggle').closest('label').hidden = !(hostV2 && Array.isArray(m.features) && m.features.includes('rtc') && rtcPossible);
   maybeStartRtc();
   stats.host = m.enc ? { enc: m.enc.id } : null;

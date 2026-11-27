@@ -60,6 +60,11 @@
         <div class="bar-sub mono" id="latency">Connexion…</div>
       </div>
       <button class="ca-ibtn ca-ibtn--glass ib" id="zoomResetBtn" hidden aria-label="Réinitialiser le zoom"><i class="ca-icon icon-minimize-2"></i></button>
+      <div class="draw-ui bar-tools" hidden>
+        <button class="ca-ibtn ca-ibtn--glass ib" data-tool="laser" title="Pointeur laser"><i class="ca-icon icon-crosshair"></i></button>
+        <button class="ca-ibtn ca-ibtn--glass ib" data-tool="pen" title="Crayon"><i class="ca-icon icon-pencil"></i></button>
+        <button class="ca-ibtn ca-ibtn--glass ib" data-draw-clear title="Effacer les dessins"><i class="ca-icon icon-eraser"></i></button>
+      </div>
       <button class="ca-ibtn ca-ibtn--glass ib desktop-only" id="fullBtn" aria-label="Plein écran"><i class="ca-icon icon-maximize"></i></button>
       <button class="ca-ibtn ca-ibtn--glass ib panel-btn" id="panelBtn" aria-label="Afficher les commandes"><i class="ca-icon icon-panel-bottom"></i></button>
       <button class="ca-ibtn ca-ibtn--glass ib" id="moreBtn" aria-label="Plus d'options"><i class="ca-icon icon-sliders-horizontal"></i></button>
@@ -68,6 +73,7 @@
     <div class="stage" id="stage" tabindex="-1">
       <div class="frame" id="frame"><img id="shot" alt="" draggable="false"><canvas id="vid" hidden></canvas><video id="rtcVideo" autoplay muted playsinline hidden></video></div>
       <canvas class="cursor-layer" id="cursorLayer" hidden></canvas>
+      <canvas class="draw-layer" id="drawLayer"></canvas>
       <div class="stage-msg" id="stageMsg"><span class="spinner"></span><span>Chargement de l'écran</span></div>
       <div class="ripple-layer" id="ripples"></div>
       <div class="wheel" id="wheel" aria-label="Molette"><i class="ca-icon icon-chevrons-up-down"></i></div>
@@ -145,6 +151,23 @@
         <button class="ca-seg__item" data-q="sharp"><i class="ca-icon icon-sparkles"></i>Netteté max</button>
       </div>
       <span class="sheet-hint" id="qualityHint"></span>
+    </div>
+    <div class="sheet-section draw-ui" hidden>
+      <span class="caps">Montrer sur l'écran du PC</span>
+      <div class="ca-seg full">
+        <button class="ca-seg__item" data-tool="laser"><i class="ca-icon icon-crosshair"></i>Laser</button>
+        <button class="ca-seg__item" data-tool="pen"><i class="ca-icon icon-pencil"></i>Crayon</button>
+        <button class="ca-seg__item" data-draw-undo><i class="ca-icon icon-undo-2"></i>Annuler</button>
+        <button class="ca-seg__item" data-draw-clear><i class="ca-icon icon-eraser"></i>Effacer</button>
+      </div>
+      <div class="colors">
+        <button class="color" data-color="#ff4646" aria-label="Rouge"></button>
+        <button class="color" data-color="#ffb020" aria-label="Orange"></button>
+        <button class="color" data-color="#35d07f" aria-label="Vert"></button>
+        <button class="color" data-color="#3b9bff" aria-label="Bleu"></button>
+        <button class="color" data-color="#ffffff" aria-label="Blanc"></button>
+        <button class="color" data-color="#141416" aria-label="Noir"></button>
+      </div>
     </div>
     <div class="sheet-section" id="screenSection" hidden>
       <span class="caps">Écran</span>

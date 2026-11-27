@@ -52,6 +52,12 @@ public sealed class MainForm : Form
     protected override async void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
+        if (_host.Overlay == null)
+        {
+            var overlay = new Overlay.AnnotationOverlay { OverlayEnabled = _host.Settings.OverlayVisible };
+            _ = overlay.Handle; // the handle now (the window stays hidden): the capture-exclusion probe runs on creation
+            _host.Overlay = overlay;
+        }
         var dataDir = Path.Combine(AppInfo.DataDir, "WebView2");
         try
         {

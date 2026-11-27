@@ -430,3 +430,17 @@ body.desktop .bar { height: 44px; }
 body.desktop .ripple-layer { display: none; }
 body.desktop .sheet { max-width: 440px; }
 body.desktop .sheet-section .shortcuts { grid-template-columns: repeat(8, 1fr); }
+
+/* ---------- Laser and pen ---------- */
+.draw-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.bar-tools { display: flex; gap: 4px; }
+.bar-tools .ca-ibtn.is-active { background: linear-gradient(180deg, var(--violet-400), var(--violet-500)); color: #fff; box-shadow: var(--shadow-accent); }
+.stage.annotating { touch-action: none; }
+body.desktop .stage.tool-pen, body.desktop .stage.tool-laser { cursor: crosshair; }
+.colors { display: flex; gap: 10px; padding: 2px 0; }
+.color {
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35);
+  background: var(--c); box-shadow: 0 2px 6px rgba(0,0,0,.25); padding: 0;
+}
+.color.is-active { outline: 3px solid var(--violet-500); outline-offset: 2px; }
+body.phone .bar-tools { display: none; }
