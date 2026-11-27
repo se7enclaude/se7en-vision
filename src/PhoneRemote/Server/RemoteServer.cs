@@ -7,8 +7,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
-using PhoneRemote.Capture;
-using PhoneRemote.Input;
 using PhoneRemote.Tools;
 
 namespace PhoneRemote.Server;
@@ -22,17 +20,20 @@ public sealed class RemoteServer : IAsyncDisposable
     private const string CookieName = "vision_session";
 
     private readonly SessionManager _session;
-    private readonly InputInjector _input = new();
-    private readonly ScreenCapturer _capturer = new();
+    private readonly HostServices _host;
     private readonly IFileProvider _phoneFiles;
     private WebApplication? _app;
-    private PhoneConnection? _current;
+    private ViewerConnection? _current;
 
     public int Port { get; private set; }
 
-    public RemoteServer(SessionManager session)
+    /// <summary>The viewer driving the PC right now, if any.</summary>
+    public ViewerConnection? Current => _current;
+
+    public RemoteServer(SessionManager session, HostServices host)
     {
         _session = session;
+        _host = host;
         _phoneFiles = new ManifestEmbeddedFileProvider(typeof(RemoteServer).Assembly, "wwwroot/phone");
         _session.SessionRevoked += () => _current?.Close(4001, "revoked");
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -44,11 +45,8 @@ public sealed class RemoteServer : IAsyncDisposable
         _current?.DisplayChanged();
     }
 
-    /// <summary>Releases every key and button the phone may still hold (crash, phone gone).</summary>
-    public void ReleaseInput()
-    {
-        lock (_input) _input.ReleaseAll();
-    }
+    /// <summary>Releases every key and button the viewer may still hold (crash, viewer gone).</summary>
+    public void ReleaseInput() => _host.ReleaseInput();
 
     public async Task StartAsync()
     {
@@ -168,7 +166,7 @@ public sealed class RemoteServer : IAsyncDisposable
 
     private async Task RunConnection(WebSocket ws, string userAgent, CancellationToken aborted)
     {
-        var conn = new PhoneConnection(ws, _input, _capturer);
+        var conn = new ViewerConnection(ws, _host, DeviceName(userAgent));
         var previous = Interlocked.Exchange(ref _current, conn);
         if (previous != null)
         {

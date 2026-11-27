@@ -16,6 +16,7 @@ public sealed class MainForm : Form
     private readonly SessionManager _session;
     private readonly RemoteServer _server;
     private readonly CloudflareTunnel _tunnel;
+    private readonly HostServices _host;
     private readonly WebView2 _web = new() { Dock = DockStyle.Fill };
     private readonly IFileProvider _files =
         new ManifestEmbeddedFileProvider(typeof(MainForm).Assembly, "wwwroot");
@@ -23,11 +24,12 @@ public sealed class MainForm : Form
     private bool _webReady;
     private string? _qrFor, _qrSvg;
 
-    public MainForm(SessionManager session, RemoteServer server, CloudflareTunnel tunnel)
+    public MainForm(SessionManager session, RemoteServer server, CloudflareTunnel tunnel, HostServices host)
     {
         _session = session;
         _server = server;
         _tunnel = tunnel;
+        _host = host;
 
         Text = AppInfo.Name;
         Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);

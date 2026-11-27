@@ -1,4 +1,7 @@
+using System.Runtime.InteropServices;
+using PhoneRemote.Media;
 using PhoneRemote.Server;
+using PhoneRemote.Settings;
 using PhoneRemote.Tools;
 using PhoneRemote.Tunnel;
 
@@ -16,19 +19,37 @@ internal static class Program
             return;
         }
 
+        // Support: which encoders work here (writes encoders.json and prints it), and how the screens are numbered.
+        if (args.Contains("--probe") || args.Contains("--displays"))
+        {
+            AttachConsole(-1);
+            foreach (var s in Media.Capture.Displays.All())
+                Console.WriteLine($"screen {s.Index}: {s.Name} {s.W}x{s.H}@{s.Hz} at {s.X},{s.Y} primary={s.Primary} ddagrab output_idx={s.OutputIdx}");
+            if (args.Contains("--probe"))
+            {
+                var probe = new EncoderProbe();
+                probe.RunBlocking(probeAll: args.Contains("--all"), force: true);
+                Console.WriteLine(probe.ToJson());
+            }
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
 
-        // Unexpected error: let go of every key/button the phone held, log it, tell the user.
-        RemoteServer? running = null;
+        // Unexpected error: let go of every key/button the viewer held, log it, tell the user.
+        HostServices? running = null;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => OnCrash(e.Exception, running, fatal: false);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => OnCrash(e.ExceptionObject as Exception, running, fatal: e.IsTerminating);
         TaskScheduler.UnobservedTaskException += (_, e) => { e.SetObserved(); Log.Error("tâche", e.Exception); };
         Log.Write($"Démarrage v{Application.ProductVersion}");
 
+        var settings = AppSettings.Load();
+        var encoders = new EncoderProbe();
+        var host = new HostServices(settings, encoders);
+        running = host;
         var session = new SessionManager();
-        var server = new RemoteServer(session);
-        running = server;
+        var server = new RemoteServer(session, host);
         try
         {
             server.StartAsync().GetAwaiter().GetResult();
@@ -42,8 +63,9 @@ internal static class Program
 
         using var tunnel = new CloudflareTunnel(server.Port);
         Task.Run(tunnel.Start); // the first start may unpack cloudflared.exe (~50 MB)
+        Task.Run(() => encoders.Start(settings.ProbeAll)); // unpacks ffmpeg.exe and tests the encoders (cached afterwards)
 
-        Application.Run(new MainForm(session, server, tunnel));
+        Application.Run(new MainForm(session, server, tunnel, host));
 
         tunnel.Dispose();
         server.DisposeAsync().AsTask().GetAwaiter().GetResult();
@@ -52,9 +74,9 @@ internal static class Program
 
     private static int _crashing;
 
-    private static void OnCrash(Exception? ex, RemoteServer? server, bool fatal)
+    private static void OnCrash(Exception? ex, HostServices? host, bool fatal)
     {
-        try { server?.ReleaseInput(); } catch { }
+        try { host?.ReleaseInput(); } catch { }
         Log.Error(fatal ? "fatale" : "inattendue", ex);
         if (Interlocked.Exchange(ref _crashing, 1) == 1) return; // one message at a time
         try
@@ -69,4 +91,7 @@ internal static class Program
         catch { }
         finally { Interlocked.Exchange(ref _crashing, 0); }
     }
+
+    [DllImport("kernel32.dll")]
+    private static extern bool AttachConsole(int pid);
 }
