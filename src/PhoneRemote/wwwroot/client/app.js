@@ -11,6 +11,7 @@ import { createStats } from './stats.js';
 import { createInput } from './input.js';
 import { createRtc, rtcPossible } from './rtc.js';
 import { createDraw } from './draw.js';
+import { createFiles } from './files.js';
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.replace(/\/+$/, '');
@@ -211,6 +212,20 @@ const input = createInput({
   getScreen: () => (info ? info.screen : 0),
 });
 
+const files = createFiles({
+  stage, panel: $('xferPanel'), send, hint, isDesktop,
+  sendBinary: (family, buf) => sendBinaryFlow(family, buf),
+});
+// a chunk goes on the "file" data channel when it is open (waiting when its buffer is full), else on the WebSocket
+async function sendBinaryFlow(family, buf) {
+  const dc = transport.channel(family);
+  if (dc && dc.readyState === 'open') {
+    while (dc.bufferedAmount > 1024 * 1024) await new Promise((r) => setTimeout(r, 10));
+    try { dc.send(buf); return; } catch {}
+  }
+  ws.sendBinary(buf);
+}
+
 const draw = createDraw({ stage, canvas: $('drawLayer'), layout, send, input, hint, store, getScreens: () => (info && info.screens) || null });
 draw.screenIndex = () => (info ? info.screen : 0);
 
@@ -226,6 +241,7 @@ function connect() {
   ws.connect();
 }
 function stopSession() {
+  files.reset();
   draw.clearAll();
   if (draw.tool) draw.setTool(draw.tool);
   ws.stop();
@@ -257,6 +273,7 @@ function onText(m) {
     case 'curimg': cursor.onShape(m); break;
     case 'stat': if (m.host) { stats.host = m.host; hostStat = m.host; renderLive(); } break;
     case 'rtc': rtc.onMessage(m); break;
+    case 'fopen': case 'fok': case 'frej': case 'fack': case 'fdone': case 'fcancel': files.onText(m); break;
     case 'power': onPowerAck(); break;
     case 'bye': byeWhy = m.why || ''; break;
   }
@@ -264,6 +281,7 @@ function onText(m) {
 let byeWhy = '', hostStat = null;
 function onBinary(bytes) {
   if (bytes[0] === 0xFF) { jpeg.show(new Blob([bytes], { type: 'image/jpeg' })); return; }
+  if (bytes[0] === 3) { files.onBinary(bytes); return; }
   if (video.active && decoder.push(bytes)) return;
 }
 function onClose(code) {
@@ -312,6 +330,7 @@ function onInfo(m) {
   renderScreens(m);
   cursor.enabled = hostV2 && Array.isArray(m.features) && m.features.includes('cur');
   draw.available = hostV2 && Array.isArray(m.features) && m.features.includes('draw');
+  files.available = hostV2 && Array.isArray(m.features) && m.features.includes('file');
   draw.echo = !!m.overlayExcluded;
   $('rtcToggle').closest('label').hidden = !(hostV2 && Array.isArray(m.features) && m.features.includes('rtc') && rtcPossible);
   maybeStartRtc();

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using PhoneRemote.Core;
 using PhoneRemote.Cursor;
+using PhoneRemote.Files;
 using PhoneRemote.Input;
 using PhoneRemote.Media;
 using PhoneRemote.Media.Capture;
@@ -65,6 +66,12 @@ public sealed class ViewerConnection
     // ---- direct link (WebRTC) ----
     private PeerSession? _rtc;
     private readonly Channel<string> _dcInbox = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+
+    // ---- files ----
+    private FileReceiver? _files;
+    private readonly Dictionary<uint, FileSender> _sending = new();
+    private readonly SemaphoreSlim _sendQueue = new(1, 1);
+    private uint _nextFileId = 0x80000000; // ids from this side start high, the viewer's start at 1
 
     // ---- cursor ----
     private readonly CursorShapeCache _shapesSent = new();
@@ -130,6 +137,8 @@ public sealed class ViewerConnection
             _video.Dispose();
             CursorOff();
             _host.Overlay?.Clear();
+            _files?.Dispose();
+            lock (_sending) { foreach (var f in _sending.Values) f.Cancel(); }
             PeerSession? rtc; lock (_videoGate) { rtc = _rtc; _rtc = null; }
             rtc?.Dispose();
             try { await dcPump; } catch { }
@@ -159,6 +168,7 @@ public sealed class ViewerConnection
                 catch (InvalidOperationException) { }
                 catch (FormatException) { }
             }
+            else if (r.MessageType == WebSocketMessageType.Binary) await HandleBinary(message.ToArray(), ct);
             message.SetLength(0);
         }
     }
@@ -245,6 +255,14 @@ public sealed class ViewerConnection
                 break;
             case "draw":
                 HandleDraw(m);
+                break;
+            case "fopen":
+            case "fok":
+            case "frej":
+            case "fack":
+            case "fdone":
+            case "fcancel":
+                await HandleFile(t, m, ct);
                 break;
             case "curreq":
             {
@@ -445,6 +463,7 @@ public sealed class ViewerConnection
                     }), "stat", ct);
                 }
                 _host.NotifyChanged();
+                if (_files is { Active: > 0 }) foreach (var id in _files.Sweep()) await SendText(JsonSerializer.Serialize(new { t = "fcancel", id }), ct);
             }
         }
         catch (OperationCanceledException) { }
@@ -659,16 +678,112 @@ public sealed class ViewerConnection
         catch (OperationCanceledException) { }
     }
 
-    /// <summary>Binary from a data channel (file chunks, later).</summary>
-    private Task HandleBinary(byte[] data, CancellationToken ct) => Task.CompletedTask;
+    /// <summary>Binary from the viewer (WebSocket or data channel): file chunks.</summary>
+    private async Task HandleBinary(byte[] data, CancellationToken ct)
+    {
+        if (!Protocol.TryParseFileChunk(data, out var id, out var seq, out var payload)) return;
+        var r = _files;
+        if (r == null || _closing) return;
+        long ack = r.Chunk(id, seq, payload);
+        if (ack > 0) await SendText(JsonSerializer.Serialize(new { t = "fack", id, n = ack }), ct);
+        else if (ack < 0) await SendText(JsonSerializer.Serialize(new { t = "fcancel", id }), ct);
+    }
 
     private string[] Features(Settings.AppSettings s)
     {
         var f = new List<string> { "stat", "cur", "kd" };
         if (s.Rtc) f.Add("rtc");
         if (_host.Overlay != null) f.Add("draw");
+        f.Add("file");
         return f.ToArray();
     }
+
+    // ---- Files ----------------------------------------------------------------
+
+    private FileReceiver Receiver()
+    {
+        if (_files != null) return _files;
+        var s = _host.Settings;
+        var r = new FileReceiver(s.ResolvedDownloadsDir, s.MaxFileBytes);
+        r.Event += e => { _host.NotifyFile("in", e); if (e.Kind == "done") Log.Write($"Fichier reçu : {e.Name} ({FileChunker.Human(e.Size)})"); else if (e.Kind == "failed") Log.Write($"Fichier non reçu ({e.Name}) : {e.Why}"); };
+        _files = r;
+        return r;
+    }
+
+    private async Task HandleFile(string t, JsonElement m, CancellationToken ct)
+    {
+        uint id = (uint)Math.Max(0, Json.Num(m, "id"));
+        switch (t)
+        {
+            case "fopen": // viewer → this PC
+            {
+                if (_closing) return;
+                var why = Receiver().Open(id, Json.Str(m, "name"), (long)Json.Num(m, "size"));
+                await SendText(JsonSerializer.Serialize(why == null ? new { t = "fok", id, why = (string?)null } : new { t = "frej", id, why }), ct);
+                break;
+            }
+            case "fdone": // viewer finished sending, or viewer saved what we sent
+            {
+                FileSender? sender; lock (_sending) _sending.TryGetValue(id, out sender);
+                if (sender != null) { sender.Done(Json.Bool(m, "ok", true)); break; }
+                var path = _files?.Done(id, Json.Str(m, "sha", ""));
+                await SendText(JsonSerializer.Serialize(new { t = "fdone", id, ok = path != null }), ct);
+                break;
+            }
+            case "fok": { FileSender? sd; lock (_sending) _sending.TryGetValue(id, out sd); sd?.Ok(); break; }
+            case "frej": { FileSender? sd; lock (_sending) _sending.TryGetValue(id, out sd); sd?.Rejected(Json.Str(m, "why", "refusé")); break; }
+            case "fack": { FileSender? sd; lock (_sending) _sending.TryGetValue(id, out sd); sd?.Ack((uint)Math.Max(0, Json.Num(m, "n"))); break; }
+            case "fcancel":
+            {
+                FileSender? sd; lock (_sending) _sending.TryGetValue(id, out sd);
+                if (sd != null) sd.Cancel(); else _files?.Cancel(id, "annulé par l’expéditeur");
+                break;
+            }
+        }
+    }
+
+    /// <summary>Sends a file from this PC to the viewer (drop on the host window). Transfers go one after the other.</summary>
+    public async Task<string?> SendFileAsync(string path)
+    {
+        var ct = _ct;
+        if (_version < 2) return "le viewer connecté ne sait pas recevoir de fichiers (version trop ancienne)";
+        if (!File.Exists(path)) return "fichier introuvable";
+        var info = new FileInfo(path);
+        if (info.Length > _host.Settings.MaxFileBytes) return $"fichier trop gros (max {FileChunker.Human(_host.Settings.MaxFileBytes)})";
+        var id = Interlocked.Increment(ref _nextFileId);
+        var sender = new FileSender(id, path, text => SendText(text, ct), chunk => SendChunk(chunk, ct));
+        lock (_sending) _sending[id] = sender;
+        _host.NotifyFile("out", new FileEvent("open", id, sender.Name, sender.Size, 0, path, null, false));
+        await _sendQueue.WaitAsync(ct);
+        try
+        {
+            var why = await sender.RunAsync(ct);
+            _host.NotifyFile("out", why == null
+                ? new FileEvent("done", id, sender.Name, sender.Size, sender.Size, path, null, false)
+                : new FileEvent("failed", id, sender.Name, sender.Size, sender.Sent, path, why, false));
+            if (why == null) Log.Write($"Fichier envoyé : {sender.Name} ({FileChunker.Human(sender.Size)})"); else Log.Write($"Fichier non envoyé ({sender.Name}) : {why}");
+            return why;
+        }
+        catch (OperationCanceledException) { return "connexion terminée"; }
+        finally
+        {
+            _sendQueue.Release();
+            lock (_sending) _sending.Remove(id);
+            sender.Dispose();
+        }
+    }
+
+    public void CancelFile(uint id)
+    {
+        FileSender? sd; lock (_sending) _sending.TryGetValue(id, out sd);
+        if (sd != null) { sd.Cancel(); _ = SendText(JsonSerializer.Serialize(new { t = "fcancel", id }), _ct); }
+    }
+
+    /// <summary>
+    /// A file chunk to the viewer, always on the WebSocket: 16 KiB messages sent by SIPSorcery on a data channel
+    /// reach the browser damaged (its SCTP fragmentation), while the browser's own 16 KiB messages to us are fine.
+    /// </summary>
+    private Task SendChunk(byte[] chunk, CancellationToken ct) => SendBinary(chunk, ct);
 
     /// <summary>Laser dot and pen strokes: fractions of a screen, drawn by the overlay window.</summary>
     private void HandleDraw(JsonElement m)

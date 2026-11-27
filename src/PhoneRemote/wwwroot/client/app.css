@@ -444,3 +444,27 @@ body.desktop .stage.tool-pen, body.desktop .stage.tool-laser { cursor: crosshair
 }
 .color.is-active { outline: 3px solid var(--violet-500); outline-offset: 2px; }
 body.phone .bar-tools { display: none; }
+
+/* ---------- Files ---------- */
+.xfer-panel {
+  position: absolute; right: 10px; bottom: 10px; z-index: 6; width: min(360px, calc(100% - 20px));
+  padding: 8px; border-radius: var(--radius-md);
+  background: rgba(20,20,22,.78); color: #fff; border: 1px solid rgba(255,255,255,.14);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+.xfer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow: auto; }
+.xfer { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 12px; background: rgba(255,255,255,.06); }
+.xfer > .ca-icon { font-size: 18px; color: var(--violet-300, #b7a9ff); flex: none; }
+.xfer-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.xfer-name { font: var(--type-label); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xfer-meta { font-size: 11px; color: rgba(255,255,255,.7); }
+.xfer.failed .xfer-meta { color: #FF8A82; }
+.xfer-actions { display: flex; gap: 6px; flex: none; }
+.drop-hint {
+  position: absolute; inset: 0; z-index: 7; display: none; align-items: center; justify-content: center; gap: 12px;
+  background: rgba(122,100,240,.28); color: #fff; font: var(--type-h3); pointer-events: none;
+  border: 3px dashed rgba(255,255,255,.7); border-radius: inherit;
+}
+.drop-hint .ca-icon { font-size: 28px; }
+.stage.drop .drop-hint { display: flex; }
+body.phone [data-send-file].ib { display: none; }

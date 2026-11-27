@@ -72,6 +72,20 @@
         </div>
       </div>
 
+      <div class="ca-tile files-tile" id="filesTile">
+        <div class="files-head">
+          <span class="caps">Fichiers</span>
+          <button class="ca-btn ca-btn--ghost ca-btn--sm" id="openDownloadsBtn"><i class="ca-icon icon-folder-open"></i>Dossier de réception</button>
+        </div>
+        <div class="files-drop" id="filesDrop">
+          <i class="ca-icon icon-upload"></i>
+          <span id="filesDropText">Dépose un fichier ici pour l'envoyer à l'appareil connecté</span>
+          <button class="ca-btn ca-btn--glass ca-btn--sm" id="pickFileBtn"><i class="ca-icon icon-file-plus"></i>Choisir…</button>
+          <input type="file" id="filePicker" multiple hidden>
+        </div>
+        <ul class="files-list" id="filesList"></ul>
+      </div>
+
       <div class="actions">
         <button class="ca-btn ca-btn--glass ca-btn--md" id="newLinkBtn"><i class="ca-icon icon-refresh-cw"></i>Nouveau lien</button>
         <button class="ca-btn ca-btn--danger ca-btn--md" id="disconnectBtn" hidden><i class="ca-icon icon-unplug"></i>Déconnecter</button>

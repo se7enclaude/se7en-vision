@@ -60,6 +60,8 @@
         <div class="bar-sub mono" id="latency">Connexion…</div>
       </div>
       <button class="ca-ibtn ca-ibtn--glass ib" id="zoomResetBtn" hidden aria-label="Réinitialiser le zoom"><i class="ca-icon icon-minimize-2"></i></button>
+      <button class="ca-ibtn ca-ibtn--glass ib file-ui" data-send-file title="Envoyer un fichier au PC" hidden><i class="ca-icon icon-file-up"></i></button>
+      <input type="file" id="filePick" multiple hidden>
       <div class="draw-ui bar-tools" hidden>
         <button class="ca-ibtn ca-ibtn--glass ib" data-tool="laser" title="Pointeur laser"><i class="ca-icon icon-crosshair"></i></button>
         <button class="ca-ibtn ca-ibtn--glass ib" data-tool="pen" title="Crayon"><i class="ca-icon icon-pencil"></i></button>
@@ -79,6 +81,8 @@
       <div class="wheel" id="wheel" aria-label="Molette"><i class="ca-icon icon-chevrons-up-down"></i></div>
       <div class="hint-chip" id="hintChip"></div>
       <div class="stats-badge mono" id="statsBadge" hidden></div>
+      <div class="xfer-panel ca-glass" id="xferPanel" hidden><ul class="xfer-list"></ul></div>
+      <div class="drop-hint"><i class="ca-icon icon-upload"></i><span>Dépose pour envoyer au PC</span></div>
       <div class="safari-tip" id="safariTip" hidden>
         <i class="ca-icon icon-maximize-2 safari-tip__icon"></i>
         <div class="safari-tip__text">
@@ -168,6 +172,11 @@
         <button class="color" data-color="#ffffff" aria-label="Blanc"></button>
         <button class="color" data-color="#141416" aria-label="Noir"></button>
       </div>
+    </div>
+    <div class="sheet-section file-ui" hidden>
+      <span class="caps">Fichiers</span>
+      <button class="ca-btn ca-btn--glass ca-btn--md wide" data-send-file><i class="ca-icon icon-file-up"></i>Envoyer un fichier au PC</button>
+      <span class="sheet-hint">Les fichiers que le PC t'envoie apparaissent sur l'écran, avec un bouton pour les enregistrer.</span>
     </div>
     <div class="sheet-section" id="screenSection" hidden>
       <span class="caps">Écran</span>

@@ -43,10 +43,26 @@ public sealed class MainForm : Form
 
         _session.Changed += PushStateSoon;
         _tunnel.Changed += PushStateSoon;
+        _host.FileChanged += (dir, ev) => { if (IsHandleCreated) BeginInvoke(() => OnFile(dir, ev)); };
 
         var tick = new System.Windows.Forms.Timer { Interval = 30_000 };
         tick.Tick += (_, _) => { if (_session.PhoneConnected) PushState(); };
         tick.Start();
+
+        // Local testing only (VISION_DEBUG=1): paths listed in send.txt next to debug.txt are sent to the viewer.
+        if (Environment.GetEnvironmentVariable("VISION_DEBUG") == "1")
+        {
+            var dbg = new System.Windows.Forms.Timer { Interval = 2000 };
+            dbg.Tick += (_, _) =>
+            {
+                var f = Path.Combine(AppInfo.DataDir, "send.txt");
+                if (!File.Exists(f)) return;
+                string[] lines;
+                try { lines = File.ReadAllLines(f); File.Delete(f); } catch { return; }
+                foreach (var l in lines) if (l.Trim().Length > 0) _ = SendFile(l.Trim());
+            };
+            dbg.Start();
+        }
     }
 
     protected override async void OnLoad(EventArgs e)
@@ -81,6 +97,7 @@ public sealed class MainForm : Form
         core.AddWebResourceRequestedFilter(Origin + "/*", CoreWebView2WebResourceContext.All);
         core.WebResourceRequested += OnResource;
         core.WebMessageReceived += OnMessage;
+        core.Settings.IsWebMessageEnabled = true;
         core.NewWindowRequested += (_, a) => a.Handled = true;
         core.Navigate(Origin + "/desktop/index.html");
     }
@@ -114,8 +131,21 @@ public sealed class MainForm : Form
         }
         catch { return; }
 
+        if (type == "sendFiles")
+        {
+            // files dropped on the window or picked: WebView2 hands us their paths
+            foreach (var o in e.AdditionalObjects ?? Array.Empty<object>())
+                if (o is CoreWebView2File f) _ = SendFile(f.Path);
+            return;
+        }
         switch (type)
         {
+            case "openDownloads":
+            {
+                var dir = _host.Settings.ResolvedDownloadsDir;
+                try { Directory.CreateDirectory(dir); System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + dir + "\"") { UseShellExecute = true }); } catch { }
+                break;
+            }
             case "ready":
                 _webReady = true;
                 PushState();
@@ -176,6 +206,20 @@ public sealed class MainForm : Form
         if (_webReady) _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
     }
 
+    private async Task SendFile(string path)
+    {
+        var conn = _server.Current;
+        if (conn == null) { Post(new { type = "fileError", error = "Personne n’est connecté : il n’y a pas de destinataire." }); return; }
+        var why = await conn.SendFileAsync(path);
+        if (why != null) Post(new { type = "fileError", error = Path.GetFileName(path) + " : " + why });
+    }
+
+    private void OnFile(string dir, Files.FileEvent ev)
+    {
+        Post(new { type = "file", dir, kind = ev.Kind, id = ev.Id, name = ev.Name, size = ev.Size, done = ev.Done, why = ev.Why, risky = ev.Risky });
+        PushState();
+    }
+
     private string? CurrentLink() =>
         _tunnel.PublicUrl is { } u ? $"{u}/s/{_session.Token}" : null;
 
@@ -211,6 +255,9 @@ public sealed class MainForm : Form
             connectedMinutes = _session.ConnectedSince is { } since ? (int)(DateTime.Now - since).TotalMinutes : 0,
             failed = _session.FailedAttempts,
             maxAttempts = SessionManager.MaxAttempts,
+            files = _host.RecentFiles.Select(f => new { f.Dir, f.Name, f.Size, at = f.At.ToString("o") }),
+            downloadsDir = _host.Settings.ResolvedDownloadsDir,
+            transport = _server.Current?.Transport,
             recent = _host.Settings.Recent.Select(r => new { r.Url, r.Name, at = r.At.ToString("o"), host = new Uri(r.Url).Host, open = _viewers.Any(v => v.Link == r.Url && !v.IsDisposed) }),
         };
         _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(state));

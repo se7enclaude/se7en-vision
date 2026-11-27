@@ -59,6 +59,53 @@
     if (!/^https?:\/\/\S+\/s\/[0-9a-f]{16,64}/i.test(url)) return connectError('Ce n’est pas un lien se7en Vision. Il ressemble à https://….trycloudflare.com/s/…');
     send('connect', { url });
   });
+  // ---------- Files: drop or pick → the PC sends them to the connected device ----------
+  const transfers = new Map(); // id → row state
+  function sendFiles(files) {
+    const list = [...files];
+    if (!list.length) return;
+    if (!host) return;
+    if (!lastState || !lastState.phone) return toast('Personne n’est connecté pour recevoir', 'unplug');
+    try { host.postMessageWithAdditionalObjects({ type: 'sendFiles', count: list.length }, list); }
+    catch (e) { toast('Envoi impossible : ' + e.message, 'x'); }
+  }
+  $('pickFileBtn').addEventListener('click', () => $('filePicker').click());
+  $('filePicker').addEventListener('change', () => { sendFiles($('filePicker').files); $('filePicker').value = ''; });
+  $('openDownloadsBtn').addEventListener('click', () => send('openDownloads'));
+  let dragDepth = 0;
+  document.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+  document.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+  document.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging'); if (e.dataTransfer && e.dataTransfer.files.length) sendFiles(e.dataTransfer.files); });
+  const human = (b) => b < 1024 ? b + ' o' : b < 1048576 ? Math.round(b / 1024) + ' Ko' : b < 1073741824 ? (b / 1048576).toFixed(1).replace('.', ',') + ' Mo' : (b / 1073741824).toFixed(2).replace('.', ',') + ' Go';
+  function onFile(m) {
+    const key = m.dir + ':' + m.id;
+    let row = transfers.get(key);
+    if (!row) {
+      row = document.createElement('li');
+      row.className = 'file-row';
+      row.innerHTML = `<i class="ca-icon icon-${m.dir === 'in' ? 'download' : 'upload'}"></i><span class="name"></span><progress max="100" value="0"></progress><span class="meta"></span>`;
+      $('filesList').prepend(row);
+      transfers.set(key, row);
+      while ($('filesList').children.length > 4) $('filesList').lastElementChild.remove();
+    }
+    row.querySelector('.name').textContent = m.name;
+    const pct = m.size ? Math.round(m.done * 100 / m.size) : 100;
+    row.querySelector('progress').value = pct;
+    const meta = row.querySelector('.meta');
+    if (m.kind === 'done') {
+      row.querySelector('progress').hidden = true;
+      meta.textContent = human(m.size) + (m.dir === 'in' ? ' · reçu' : ' · envoyé');
+      toast((m.dir === 'in' ? 'Reçu : ' : 'Envoyé : ') + m.name, m.dir === 'in' ? 'download' : 'upload');
+      if (m.risky) toast('Attention : ' + m.name + ' est un programme. Ne l’ouvre que si tu l’attendais.', 'triangle-alert');
+    } else if (m.kind === 'failed') {
+      row.classList.add('failed');
+      row.querySelector('progress').hidden = true;
+      meta.textContent = m.why || 'échec';
+      toast(m.name + ' : ' + (m.why || 'échec'), 'x');
+    } else meta.textContent = pct + ' % · ' + human(m.size);
+  }
+
   function renderRecent(list) {
     const box = $('recentBox');
     box.hidden = !list || !list.length;
@@ -189,6 +236,9 @@
       $('badgeText').textContent = 'Prêt';
     }
     $('disconnectBtn').hidden = !s.phone;
+    $('filesDropText').textContent = s.phone
+      ? `Dépose un fichier ici pour l’envoyer à ${s.phoneName || 'l’appareil connecté'}`
+      : 'Quand un appareil est connecté, dépose un fichier ici pour le lui envoyer';
     renderRecent(s.recent);
     if (s.phone && !lastPhone) toast(`${s.phoneName || 'Téléphone'} connecté`, 'smartphone');
     lastPhone = s.phone;
@@ -200,6 +250,8 @@
       if (e.data.type === 'state') render(e.data);
       else if (e.data.type === 'pinSaved') onPinSaved(e.data);
       else if (e.data.type === 'connectError') connectError(e.data.error);
+      else if (e.data.type === 'file') onFile(e.data);
+      else if (e.data.type === 'fileError') toast(e.data.error, 'x');
     });
     send('ready');
   }

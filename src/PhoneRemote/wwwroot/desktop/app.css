@@ -163,3 +163,25 @@ h1 { font: var(--type-h1); letter-spacing: var(--ls-heading); margin: 6px 0 6px;
   display: grid; place-items: center; font-size: 12px; font-weight: var(--fw-bold); color: #fff;
   background: var(--tone-violet);
 }
+
+/* ---------- Files ---------- */
+.files-tile { padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.files-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.files-drop {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 14px;
+  border: 1.5px dashed var(--glass-stroke-strong, rgba(120,100,90,.35));
+  color: var(--text-secondary); font: var(--type-label); font-weight: var(--fw-regular);
+  transition: background var(--dur-base), border-color var(--dur-base);
+}
+.files-drop .ca-icon { font-size: 18px; color: var(--violet-500); }
+.files-drop span { flex: 1; }
+.files-drop.over, body.dragging .files-drop { background: var(--accent-soft); border-color: var(--violet-500); color: var(--text-primary); }
+.files-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.files-list:empty { display: none; }
+.file-row { display: flex; align-items: center; gap: 8px; font: var(--type-label); font-weight: var(--fw-regular); font-size: 13px; }
+.file-row .ca-icon { font-size: 15px; color: var(--text-tertiary); }
+.file-row .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-row .meta { color: var(--text-tertiary); font-size: 12px; }
+.file-row progress { width: 90px; height: 6px; accent-color: var(--violet-500); }
+.file-row.failed .meta { color: #D2302A; }

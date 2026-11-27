@@ -19,6 +19,24 @@ public sealed class HostServices
 
     /// <summary>Raised when something the host window shows changed (viewer stats, transport…).</summary>
     public event Action? Changed;
+    /// <summary>A file came in, went out, or failed: (direction "in"|"out", event).</summary>
+    public event Action<string, Files.FileEvent>? FileChanged;
+    /// <summary>The last files received or sent, newest first (shown in the host window).</summary>
+    public List<(string Dir, string Name, string? Path, long Size, DateTime At)> RecentFiles { get; } = new();
+
+    public void NotifyFile(string dir, Files.FileEvent e)
+    {
+        if (e.Kind == "done")
+        {
+            lock (RecentFiles)
+            {
+                RecentFiles.Insert(0, (dir, e.Name, e.Path, e.Size, DateTime.Now));
+                if (RecentFiles.Count > 6) RecentFiles.RemoveAt(RecentFiles.Count - 1);
+            }
+        }
+        FileChanged?.Invoke(dir, e);
+        NotifyChanged();
+    }
 
     public HostServices(AppSettings settings, EncoderProbe probe)
     {
