@@ -1,2 +1,2 @@
-/* Lucide icon font (CDN). Usage: <i class="icon-mic"></i> or <Icon name="mic" /> */
-@import url('https://unpkg.com/lucide-static@0.454.0/font/lucide.css');
+/* Lucide icon font (ISC licence), bundled. Usage: <i class="ca-icon icon-mic"></i> */
+@import url('fonts/lucide.css');

@@ -46,6 +46,15 @@ public sealed class HostServices
 
     public void NotifyChanged() => Changed?.Invoke();
 
+    /// <summary>« Réglages » changed: connections re-plan their video, the overlay follows its switch.</summary>
+    public event Action? SettingsChanged;
+    public void NotifySettingsChanged()
+    {
+        if (Overlay != null) Overlay.OverlayEnabled = Settings.OverlayVisible;
+        SettingsChanged?.Invoke();
+        Changed?.Invoke();
+    }
+
     /// <summary>Releases every key and button a viewer may still hold (crash, viewer gone).</summary>
     public void ReleaseInput()
     {

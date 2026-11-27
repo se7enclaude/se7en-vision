@@ -1,5 +1,7 @@
-se7en Vision inclut les programmes suivants, distribués séparément dans l'exécutable
-et lancés comme des programmes indépendants.
+se7en Vision inclut les programmes et bibliothèques suivants.
+
+Programmes séparés, embarqués dans l'exécutable et lancés comme des processus indépendants
+------------------------------------------------------------------------------------------
 
 cloudflared — Cloudflare, Inc.
   Licence : Apache 2.0
@@ -11,3 +13,44 @@ FFmpeg 9.0.2 « essentials build » — compilé par Gyan Doshi (gyan.dev)
   Source  : https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
             et les sources des bibliothèques listées sur https://www.gyan.dev/ffmpeg/builds/
   Texte de la licence : https://www.gnu.org/licenses/gpl-3.0.html
+
+Bibliothèques .NET (connexion directe WebRTC et interface)
+----------------------------------------------------------
+
+SIPSorcery 10.0.17 et SIPSorceryMedia.Abstractions 10.0.17 — Aaron Clauson et contributeurs
+  Licence : BSD 3-Clause
+  Source  : https://github.com/sipsorcery-org/sipsorcery
+  Dépendances : BouncyCastle.Cryptography (MIT, https://www.bouncycastle.org/),
+  Concentus (BSD 3-Clause, https://github.com/lostromb/concentus),
+  DnsClient (Apache 2.0, https://github.com/MichaCo/DnsClient.NET),
+  Makaretu.Dns et Makaretu.Dns.Multicast (MIT, https://github.com/richardschneider/net-mdns),
+  SimpleBase (MIT, https://github.com/ssg/SimpleBase), IPNetwork2 (BSD 2-Clause),
+  Common.Logging (Apache 2.0), SIPSorcery.WebSocketSharp (MIT).
+
+Microsoft.Web.WebView2 — Microsoft
+  Licence : licence Microsoft WebView2 (https://aka.ms/webview2-license)
+
+QRCoder — Raffael Herrmann
+  Licence : MIT — https://github.com/codebude/QRCoder
+
+Microsoft.Extensions.FileProviders.Embedded — Microsoft
+  Licence : MIT — https://github.com/dotnet/aspnetcore
+
+Polices et icônes (interface, embarquées : rien n'est chargé depuis Internet)
+-----------------------------------------------------------------------------
+
+Geist et Geist Mono — Vercel
+  Licence : SIL Open Font License 1.1 — https://github.com/vercel/geist-font
+  Texte de la licence : src/PhoneRemote/wwwroot/ds/fonts/Geist-LICENSE.txt
+
+Lucide (police d'icônes) — Lucide Contributors, d'après Feather (Cole Bemis)
+  Licence : ISC — https://lucide.dev
+  Texte de la licence : src/PhoneRemote/wwwroot/ds/fonts/lucide-LICENSE.txt
+
+Services réseau utilisés
+------------------------
+
+Cloudflare Quick Tunnels (*.trycloudflare.com) pour le lien d'accès, et les serveurs STUN publics
+de Google (stun.l.google.com) et de Cloudflare (stun.cloudflare.com) pour trouver un chemin direct
+entre les deux appareils. Aucun compte n'est nécessaire ; aucune donnée d'écran ne passe par les
+serveurs STUN.

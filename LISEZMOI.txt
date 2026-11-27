@@ -1,5 +1,5 @@
-SE7EN VISION — contrôle ton PC depuis ton iPhone
-================================================
+SE7EN VISION — contrôle un PC depuis ton iPhone ou depuis un autre PC
+=====================================================================
 
 Utilisation
 -----------
@@ -8,8 +8,21 @@ Utilisation
 3. Entre le code à 6 chiffres affiché sur le PC.
 4. C'est parti : tu vois l'écran du PC et tu le contrôles, en Wi-Fi comme en 4G/5G.
 
-Le lien et le code changent à chaque ouverture de se7en Vision.
+Le lien change à chaque ouverture de se7en Vision ; ton code, lui, reste le tien.
 Ferme se7en Vision pour tout couper : le lien cesse aussitôt de fonctionner.
+
+Depuis un autre PC
+------------------
+Onglet « Se connecter à un PC » : colle le lien que l'autre personne t'a donné (bouton
+« copier le lien » chez elle), entre son code, et son écran s'ouvre dans une fenêtre.
+  - Ta souris et ton clavier agissent sur son PC ; clique dans l'écran pour lui donner
+    le clavier, Ctrl+Maj+Échap pour le reprendre
+  - Bouton plein écran en haut à droite
+  - Laser et crayon : montre ou dessine sur son écran (bouton Effacer pour nettoyer)
+  - Dépose un fichier sur l'écran pour le lui envoyer ; ce qu'il t'envoie s'affiche
+    en bas à droite avec un bouton « Enregistrer »
+Quand les box le permettent, l'image passe en direct entre les deux PC (« Direct » dans
+l'indicateur) ; sinon elle passe par le tunnel, automatiquement.
 
 Gestes sur l'iPhone
 -------------------
@@ -49,17 +62,33 @@ Toujours disponibles
     verrouiller / mettre en veille / redémarrer / éteindre le PC (avec confirmation),
     affichage (Vidéo fluide ou Images), qualité, choix de l'écran, vitesses
 
-Affichage
-  - Vidéo fluide (par défaut) : 30 images par seconde, il faut iOS 16.4 ou plus récent
+Affichage et qualité
+  - Vidéo (par défaut) : encodée par la carte graphique du PC, jusqu'à 144 images par
+    seconde selon l'écran et la connexion (iOS 16.4 ou plus récent)
   - Images : une image à la fois, plus lent mais marche partout et avec une connexion faible
   - Si la vidéo ne peut pas démarrer, se7en Vision passe tout seul aux images
+  - Qualité : Rapide (réactivité), Équilibré, Netteté max (résolution native, bonne connexion)
+  - Indicateur ping · i/s · débit : dans les réglages, section Affichage
+  - Écran : choisis l'écran du PC, ou « Tous » pour les voir en même temps
+  - Montrer sur l'écran du PC : pointeur laser et crayon, en six couleurs
+  - Fichiers : « Envoyer un fichier au PC » ; les fichiers reçus se partagent ou s'enregistrent
+
+Sur le PC (fenêtre se7en Vision)
+  - Mon PC : QR code, lien, code, qui est connecté, zone de dépôt pour envoyer un fichier
+  - Se connecter à un PC : les liens récents et le champ pour en coller un nouveau
+  - Réglages : encodeur, format vidéo, cadence maximale, économie d'énergie,
+    connexion directe, dossier de réception (Téléchargements \ se7en Vision)
 
 Sécurité
 --------
 - Ne donne le code qu'à quelqu'un en qui tu as confiance : il contrôle tout le PC.
 - Après 5 codes faux, le lien est désactivé et un nouveau QR code apparaît.
 - Un seul téléphone à la fois. Le bouton « Déconnecter » coupe l'accès immédiatement.
-- La connexion passe par un tunnel Cloudflare gratuit, chiffré en HTTPS.
+- La connexion passe par un tunnel Cloudflare gratuit, chiffré en HTTPS, ou en direct
+  entre les deux appareils (chiffré aussi). En direct, chacun voit l'adresse IP de l'autre :
+  la connexion directe se désactive dans Réglages.
+- Les fichiers reçus ne sont gardés qu'une fois vérifiés, jamais à la place d'un autre
+  fichier ; un programme reçu (.exe, .bat...) est signalé.
 
 Bon à savoir
 ------------

@@ -64,6 +64,9 @@ public sealed class RemoteServer : IAsyncDisposable
             h["X-Frame-Options"] = "DENY";
             h["X-Content-Type-Options"] = "nosniff";
             h["Referrer-Policy"] = "no-referrer";
+            // the viewer page only ever talks to this server: its own scripts, styles and fonts, its WebSocket,
+            // blob/data URLs for the pictures it builds, and the WebRTC link (no CSP directive governs that)
+            h["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
             await next();
         });
         app.UseStaticFiles(new StaticFileOptions { FileProvider = _phoneFiles, RequestPath = "/client" });

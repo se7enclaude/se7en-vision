@@ -14,6 +14,7 @@
     <nav class="ca-tabs ca-tabs--sm tabs" role="tablist">
       <button class="ca-tab is-active" data-tab="host" role="tab"><i class="ca-icon icon-monitor"></i>Mon PC</button>
       <button class="ca-tab" data-tab="connect" role="tab"><i class="ca-icon icon-cable"></i>Se connecter à un PC</button>
+      <button class="ca-tab" data-tab="settings" role="tab"><i class="ca-icon icon-settings-2"></i>Réglages</button>
     </nav>
     <span class="spacer"></span>
     <div class="ca-seg" role="group" aria-label="Thème">
@@ -121,6 +122,40 @@
       </ol>
       <span class="hint">Le PC contrôlé garde la main : il peut déconnecter à tout moment.</span>
     </aside>
+  </main>
+
+  <main class="panel panel--settings ca-glass" id="tabSettings" hidden>
+    <section class="settings-col">
+      <div class="ca-tile set-tile">
+        <span class="caps">Vidéo</span>
+        <label class="set-row"><span>Encodeur<small>Automatique : le meilleur qui marche sur ce PC (carte graphique d'abord).</small></span>
+          <select class="ca-select" id="setEncoder" data-setting="encoder"><option value="auto">Automatique</option></select></label>
+        <label class="set-row"><span>Format vidéo<small>HEVC et AV1 pèsent moins lourd ; ils ne servent que si l'appareil en face sait les lire.</small></span>
+          <div class="ca-seg ca-seg--sm" data-setting-seg="codec"><button class="ca-seg__item" data-v="avc1">H.264</button><button class="ca-seg__item" data-v="hvc1">HEVC</button><button class="ca-seg__item" data-v="av01">AV1</button></div></label>
+        <label class="set-row"><span>Images par seconde, au plus<small>L'écran et la connexion peuvent en donner moins.</small></span>
+          <div class="ca-seg ca-seg--sm" data-setting-seg="fpsCap"><button class="ca-seg__item" data-v="30">30</button><button class="ca-seg__item" data-v="60">60</button><button class="ca-seg__item" data-v="120">120</button><button class="ca-seg__item" data-v="144">144</button><button class="ca-seg__item" data-v="240">240</button></div></label>
+        <label class="set-row"><span>Économie d'énergie<small>Rien n'est envoyé tant que l'écran ne change pas.</small></span><input type="checkbox" class="ca-switch" data-setting="powerSaver"></label>
+      </div>
+      <div class="ca-tile set-tile">
+        <span class="caps">Connexion directe</span>
+        <label class="set-row"><span>Connexion directe (WebRTC)<small>L'image va droit à l'autre appareil quand les box le permettent, sinon par le tunnel.</small></span><input type="checkbox" class="ca-switch" data-setting="rtc"></label>
+        <label class="set-row"><span>Proposer toutes mes adresses réseau<small>Utile avec un VPN ou plusieurs cartes réseau. L'autre appareil voit ces adresses.</small></span><input type="checkbox" class="ca-switch" data-setting="rtcAllInterfaces"></label>
+        <label class="set-row"><span>Autoriser HEVC en direct<small>Plus net à débit égal ; pas tous les appareils ne le lisent.</small></span><input type="checkbox" class="ca-switch" data-setting="allowHevcRtc"></label>
+      </div>
+    </section>
+    <section class="settings-col">
+      <div class="ca-tile set-tile">
+        <span class="caps">Annotations et fichiers</span>
+        <label class="set-row"><span>Laser et crayon sur mes écrans<small>Ce que l'autre personne dessine s'affiche ici, par-dessus tout.</small></span><input type="checkbox" class="ca-switch" data-setting="overlayVisible"></label>
+        <div class="set-row"><span>Dossier de réception<small class="mono" id="setDownloadsDir"></small></span>
+          <div class="set-btns"><button class="ca-btn ca-btn--glass ca-btn--sm" id="setPickDir"><i class="ca-icon icon-folder"></i>Choisir…</button><button class="ca-btn ca-btn--ghost ca-btn--sm" id="setOpenDir"><i class="ca-icon icon-folder-open"></i>Ouvrir</button></div></div>
+      </div>
+      <div class="ca-tile set-tile">
+        <div class="set-head"><span class="caps">Encodeurs testés sur ce PC</span><button class="ca-btn ca-btn--ghost ca-btn--sm" id="reprobeBtn"><i class="ca-icon icon-rotate-cw"></i>Retester</button></div>
+        <ul class="enc-list" id="encList"></ul>
+        <label class="set-row"><span>Tester aussi les encodeurs d'autres marques<small>Normalement inutile : seuls ceux de ta carte graphique sont testés.</small></span><input type="checkbox" class="ca-switch" data-setting="probeAll"></label>
+      </div>
+    </section>
   </main>
 
   <footer class="foot">Ferme se7en Vision pour tout couper : le lien cesse aussitôt de fonctionner.</footer>

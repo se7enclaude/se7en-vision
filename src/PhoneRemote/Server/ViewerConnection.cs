@@ -92,6 +92,12 @@ public sealed class ViewerConnection
         DeviceName = deviceName;
         _video = new VideoSession(host.Probe);
         _video.State += OnVideoState;
+        host.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged()
+    {
+        if (VideoWanted) StartVideo();
     }
 
     public void Close(int code, string reason)
@@ -136,6 +142,7 @@ public sealed class ViewerConnection
             StopVideo();
             _video.Dispose();
             CursorOff();
+            _host.SettingsChanged -= OnSettingsChanged;
             _host.Overlay?.Clear();
             _files?.Dispose();
             lock (_sending) { foreach (var f in _sending.Values) f.Cancel(); }

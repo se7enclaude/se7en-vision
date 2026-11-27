@@ -38,11 +38,50 @@
     document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('is-active', b.dataset.tab === name));
     $('tabHost').hidden = name !== 'host';
     $('tabConnect').hidden = name !== 'connect';
+    $('tabSettings').hidden = name !== 'settings';
     try { localStorage.setItem('vision-tab', name); } catch {}
     if (name === 'connect') setTimeout(() => $('connectUrl').focus(), 50);
   }
   document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
-  try { if (localStorage.getItem('vision-tab') === 'connect') showTab('connect'); } catch {}
+  try { const t = localStorage.getItem('vision-tab'); if (t === 'connect' || t === 'settings') showTab(t); } catch {}
+
+  // ---------- Réglages ----------
+  const setSetting = (key, value) => send('setSetting', { key, value });
+  document.querySelectorAll('input[data-setting]').forEach((el) => el.addEventListener('change', () => setSetting(el.dataset.setting, el.checked)));
+  $('setEncoder').addEventListener('change', () => setSetting('encoder', $('setEncoder').value));
+  document.querySelectorAll('[data-setting-seg]').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    const v = b.dataset.v;
+    setSetting(seg.dataset.settingSeg, seg.dataset.settingSeg === 'fpsCap' ? Number(v) : v);
+    seg.querySelectorAll('button').forEach((x) => x.classList.toggle('is-active', x === b));
+  })));
+  $('setPickDir').addEventListener('click', () => send('pickDownloads'));
+  $('setOpenDir').addEventListener('click', () => send('openDownloads'));
+  $('reprobeBtn').addEventListener('click', () => send('reprobe'));
+  function renderSettings(s) {
+    if (!s.settings) return;
+    const st = s.settings;
+    document.querySelectorAll('input[data-setting]').forEach((el) => { if (document.activeElement !== el) el.checked = !!st[el.dataset.setting]; });
+    document.querySelectorAll('[data-setting-seg]').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', String(st[seg.dataset.settingSeg]) === b.dataset.v)));
+    const sel = $('setEncoder');
+    const wanted = [['auto', 'Automatique'], ...(s.encoders || []).filter((e) => e.ok).map((e) => [e.id, e.label])];
+    if ([...sel.options].map((o) => o.value).join() !== wanted.map((w) => w[0]).join()) {
+      sel.replaceChildren(...wanted.map(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; }));
+    }
+    sel.value = wanted.some((w) => w[0] === st.encoder) ? st.encoder : 'auto';
+    $('setDownloadsDir').textContent = s.downloadsDir || '';
+    const list = $('encList');
+    const items = (s.encoders || []).map((e) => {
+      const li = document.createElement('li');
+      li.className = e.ok ? 'ok' : '';
+      li.innerHTML = '<span class="dot"></span><span class="name"></span><span class="meta"></span>';
+      li.querySelector('.name').textContent = e.label;
+      li.querySelector('.meta').textContent = e.ok ? (e.fps ? `${e.fps} i/s` : 'OK') : (e.error || 'indisponible');
+      return li;
+    });
+    if (s.probing) { const li = document.createElement('li'); li.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span><span>Test en cours…</span>'; items.unshift(li); }
+    list.replaceChildren(...items);
+    $('reprobeBtn').disabled = !!s.probing;
+  }
 
   // ---------- Se connecter à un PC ----------
   const connectHint = $('connectHint');
@@ -236,6 +275,12 @@
       $('badgeText').textContent = 'Prêt';
     }
     $('disconnectBtn').hidden = !s.phone;
+    renderSettings(s);
+    if (s.phone && s.viewer) {
+      const v = s.viewer;
+      const via = v.transport === 'local' ? 'en direct (réseau local)' : v.transport === 'rtc' ? 'en direct' : 'par le tunnel';
+      $('statusDesc').textContent = `${via} · ${v.rtt} ms · ${v.fps} i/s · ${v.kbps >= 1000 ? (v.kbps / 1000).toFixed(1).replace('.', ',') + ' Mb/s' : v.kbps + ' kb/s'}`;
+    }
     $('filesDropText').textContent = s.phone
       ? `Dépose un fichier ici pour l’envoyer à ${s.phoneName || 'l’appareil connecté'}`
       : 'Quand un appareil est connecté, dépose un fichier ici pour le lui envoyer';
@@ -252,6 +297,7 @@
       else if (e.data.type === 'connectError') connectError(e.data.error);
       else if (e.data.type === 'file') onFile(e.data);
       else if (e.data.type === 'fileError') toast(e.data.error, 'x');
+      else if (e.data.type === 'toast') toast(e.data.text, e.data.icon || 'check');
     });
     send('ready');
   }

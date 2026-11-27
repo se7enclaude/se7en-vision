@@ -35,6 +35,10 @@ if (-not (Test-Path $ffmpeg)) {
     } finally { $z.Dispose(); Remove-Item $zip }
 }
 
+# Les tests d'abord : rien n'est publié si l'un d'eux échoue (dont la boucle WebRTC locale).
+dotnet test (Join-Path $root 'tests\PhoneRemote.Tests') -c Release -v q
+if ($LASTEXITCODE -ne 0) { throw 'dotnet test a échoué' }
+
 if (Test-Path $publish) { Remove-Item -Recurse -Force $publish }
 
 dotnet publish (Join-Path $root 'src\PhoneRemote\PhoneRemote.csproj') `

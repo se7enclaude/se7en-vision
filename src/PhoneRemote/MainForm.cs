@@ -44,6 +44,8 @@ public sealed class MainForm : Form
         _session.Changed += PushStateSoon;
         _tunnel.Changed += PushStateSoon;
         _host.FileChanged += (dir, ev) => { if (IsHandleCreated) BeginInvoke(() => OnFile(dir, ev)); };
+        _host.Probe.Completed += PushStateSoon;
+        _host.Changed += PushStateSoon;
 
         var tick = new System.Windows.Forms.Timer { Interval = 30_000 };
         tick.Tick += (_, _) => { if (_session.PhoneConnected) PushState(); };
@@ -140,6 +142,40 @@ public sealed class MainForm : Form
         }
         switch (type)
         {
+            case "setSetting":
+            {
+                string key = "";
+                JsonElement value = default;
+                try
+                {
+                    using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+                    key = doc.RootElement.GetProperty("key").GetString() ?? "";
+                    value = doc.RootElement.GetProperty("value").Clone();
+                }
+                catch { break; }
+                var err = _host.Settings.Apply(key, value);
+                if (err != null) { Post(new { type = "toast", text = err, icon = "x" }); break; }
+                _host.Settings.Save();
+                _host.NotifySettingsChanged();
+                PushState();
+                break;
+            }
+            case "pickDownloads":
+            {
+                using var dlg = new FolderBrowserDialog { Description = "Dossier où arrivent les fichiers reçus", UseDescriptionForTitle = true, SelectedPath = _host.Settings.ResolvedDownloadsDir };
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    _host.Settings.DownloadsDir = dlg.SelectedPath;
+                    _host.Settings.Save();
+                    PushState();
+                }
+                break;
+            }
+            case "reprobe":
+                _host.Probe.Start(probeAll: _host.Settings.ProbeAll, force: true);
+                Post(new { type = "toast", text = "Test des encodeurs en cours…", icon = "loader" });
+                PushState();
+                break;
             case "openDownloads":
             {
                 var dir = _host.Settings.ResolvedDownloadsDir;
@@ -255,6 +291,15 @@ public sealed class MainForm : Form
             connectedMinutes = _session.ConnectedSince is { } since ? (int)(DateTime.Now - since).TotalMinutes : 0,
             failed = _session.FailedAttempts,
             maxAttempts = SessionManager.MaxAttempts,
+            settings = new
+            {
+                encoder = _host.Settings.Encoder, codec = _host.Settings.Codec, fpsCap = _host.Settings.FpsCap, powerSaver = _host.Settings.PowerSaver,
+                rtc = _host.Settings.Rtc, rtcAllInterfaces = _host.Settings.RtcAllInterfaces, allowHevcRtc = _host.Settings.AllowHevcRtc,
+                overlayVisible = _host.Settings.OverlayVisible, probeAll = _host.Settings.ProbeAll,
+            },
+            encoders = _host.Probe.Results.Select(r => new { r.Id, label = Media.EncoderCatalog.Find(r.Id)?.Label ?? r.Id, r.Ok, fps = Math.Round(r.Fps), r.Error, r.Codec }),
+            probing = !_host.Probe.Done,
+            viewer = _server.Current is { } c ? new { transport = c.Transport, rtt = Math.Round(c.ViewerStats.Rtt), fps = Math.Round(c.VideoStats.Fps), kbps = c.VideoStats.Kbps, enc = c.VideoStats.Encoder } : null,
             files = _host.RecentFiles.Select(f => new { f.Dir, f.Name, f.Size, at = f.At.ToString("o") }),
             downloadsDir = _host.Settings.ResolvedDownloadsDir,
             transport = _server.Current?.Transport,
