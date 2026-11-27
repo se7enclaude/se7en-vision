@@ -13,7 +13,7 @@
 <meta name="theme-color" content="#121116" media="(prefers-color-scheme: dark)">
 <title>se7en Vision</title>
 <link rel="stylesheet" href="/ds/styles.css">
-<link rel="stylesheet" href="/phone/app.css">
+<link rel="stylesheet" href="/client/app.css">
 </head>
 <body class="ca-backdrop">
 <div class="app" id="app">
@@ -60,16 +60,19 @@
         <div class="bar-sub mono" id="latency">Connexion…</div>
       </div>
       <button class="ca-ibtn ca-ibtn--glass ib" id="zoomResetBtn" hidden aria-label="Réinitialiser le zoom"><i class="ca-icon icon-minimize-2"></i></button>
+      <button class="ca-ibtn ca-ibtn--glass ib desktop-only" id="fullBtn" aria-label="Plein écran"><i class="ca-icon icon-maximize"></i></button>
       <button class="ca-ibtn ca-ibtn--glass ib panel-btn" id="panelBtn" aria-label="Afficher les commandes"><i class="ca-icon icon-panel-bottom"></i></button>
       <button class="ca-ibtn ca-ibtn--glass ib" id="moreBtn" aria-label="Plus d'options"><i class="ca-icon icon-sliders-horizontal"></i></button>
     </header>
 
-    <div class="stage" id="stage">
-      <div class="frame" id="frame"><img id="shot" alt="" draggable="false"><canvas id="vid" hidden></canvas></div>
+    <div class="stage" id="stage" tabindex="-1">
+      <div class="frame" id="frame"><img id="shot" alt="" draggable="false"><canvas id="vid" hidden></canvas><video id="rtcVideo" autoplay muted playsinline hidden></video></div>
+      <canvas class="cursor-layer" id="cursorLayer" hidden></canvas>
       <div class="stage-msg" id="stageMsg"><span class="spinner"></span><span>Chargement de l'écran</span></div>
       <div class="ripple-layer" id="ripples"></div>
       <div class="wheel" id="wheel" aria-label="Molette"><i class="ca-icon icon-chevrons-up-down"></i></div>
       <div class="hint-chip" id="hintChip"></div>
+      <div class="stats-badge mono" id="statsBadge" hidden></div>
       <div class="safari-tip" id="safariTip" hidden>
         <i class="ca-icon icon-maximize-2 safari-tip__icon"></i>
         <div class="safari-tip__text">
@@ -108,10 +111,10 @@
       <div class="joy-scroll" id="joyScroll" aria-label="Molette"><i class="ca-icon icon-chevron-up"></i><span>Molette</span><i class="ca-icon icon-chevron-down"></i></div>
       <div class="joy-buttons">
         <button class="jb jb-main" id="jbMain"><i class="ca-icon icon-mouse-pointer-click"></i><span>Clic</span></button>
-        <button class="jb jb-sat tl" id="jbRight"><i class="ca-icon icon-mouse-pointer-2"></i><span>Droit</span></button>
-        <button class="jb jb-sat tr" id="jbDouble"><i class="ca-icon icon-copy"></i><span>Double</span></button>
-        <button class="jb jb-sat bl" id="jbHold"><i class="ca-icon icon-grab"></i><span>Maintenir</span></button>
-        <button class="jb jb-sat br" id="jbKbd"><i class="ca-icon icon-keyboard"></i><span>Clavier</span></button>
+        <button class="jb jb-sat tl" data-click="r"><i class="ca-icon icon-mouse-pointer-2"></i><span>Droit</span></button>
+        <button class="jb jb-sat tr" data-click="l" data-n="2"><i class="ca-icon icon-copy"></i><span>Double</span></button>
+        <button class="jb jb-sat bl" data-hold><i class="ca-icon icon-grab"></i><span>Maintenir</span></button>
+        <button class="jb jb-sat br" data-kbd><i class="ca-icon icon-keyboard"></i><span>Clavier</span></button>
       </div>
     </div>
 
@@ -122,10 +125,10 @@
         <button class="ca-seg__item" data-mode="joy"><i class="ca-icon icon-gamepad-2"></i>Joystick</button>
       </div>
       <div class="tools">
-        <button class="tool" id="leftBtn"><i class="ca-icon icon-mouse-pointer-click"></i><span>Gauche</span></button>
-        <button class="tool" id="rightBtn"><i class="ca-icon icon-mouse-pointer-2"></i><span>Droit</span></button>
-        <button class="tool" id="holdBtn"><i class="ca-icon icon-grab"></i><span>Maintenir</span></button>
-        <button class="tool" id="kbdBtn"><i class="ca-icon icon-keyboard"></i><span>Clavier</span></button>
+        <button class="tool" data-click="l"><i class="ca-icon icon-mouse-pointer-click"></i><span>Gauche</span></button>
+        <button class="tool" data-click="r"><i class="ca-icon icon-mouse-pointer-2"></i><span>Droit</span></button>
+        <button class="tool" data-hold><i class="ca-icon icon-grab"></i><span>Maintenir</span></button>
+        <button class="tool" data-kbd><i class="ca-icon icon-keyboard"></i><span>Clavier</span></button>
       </div>
     </nav>
   </section>
@@ -134,6 +137,28 @@
   <div class="scrim" id="scrim" hidden></div>
   <section class="sheet ca-glass" id="sheet" hidden>
     <div class="grabber"></div>
+    <div class="sheet-section">
+      <span class="caps">Qualité</span>
+      <div class="ca-seg full" id="qualitySeg">
+        <button class="ca-seg__item" data-q="fast"><i class="ca-icon icon-zap"></i>Rapide</button>
+        <button class="ca-seg__item" data-q="balanced"><i class="ca-icon icon-scale"></i>Équilibré</button>
+        <button class="ca-seg__item" data-q="sharp"><i class="ca-icon icon-sparkles"></i>Netteté max</button>
+      </div>
+      <span class="sheet-hint" id="qualityHint"></span>
+    </div>
+    <div class="sheet-section" id="screenSection" hidden>
+      <span class="caps">Écran</span>
+      <div class="ca-seg full" id="screenSeg"></div>
+    </div>
+    <div class="sheet-section">
+      <span class="caps">Affichage</span>
+      <div class="ca-seg full" id="imgSeg">
+        <button class="ca-seg__item" data-img="video">Vidéo</button>
+        <button class="ca-seg__item" data-img="jpeg">Images</button>
+      </div>
+      <span class="sheet-hint" id="imgHint"></span>
+      <label class="row-toggle"><span>Indicateur ping · i/s · débit</span><input type="checkbox" id="statsToggle" class="ca-switch"></label>
+    </div>
     <div class="sheet-section">
       <span class="caps">Raccourcis</span>
       <div class="shortcuts">
@@ -164,38 +189,18 @@
         <button class="sc danger" data-power="shutdown"><i class="ca-icon icon-power"></i>Éteindre</button>
       </div>
     </div>
-    <div class="sheet-section">
-      <span class="caps">Affichage</span>
-      <div class="ca-seg full" id="imgSeg">
-        <button class="ca-seg__item" data-img="video">Vidéo fluide</button>
-        <button class="ca-seg__item" data-img="jpeg">Images</button>
-      </div>
-      <span class="sheet-hint" id="imgHint"></span>
-    </div>
-    <div class="sheet-section">
-      <span class="caps">Qualité de l'image</span>
-      <div class="ca-seg full" id="qualitySeg">
-        <button class="ca-seg__item" data-q="fluid">Fluide</button>
-        <button class="ca-seg__item" data-q="balanced">Équilibrée</button>
-        <button class="ca-seg__item" data-q="sharp">Nette</button>
-      </div>
-    </div>
-    <div class="sheet-section" id="screenSection" hidden>
-      <span class="caps">Écran</span>
-      <div class="ca-seg full" id="screenSeg"></div>
-    </div>
-    <div class="sheet-section">
+    <div class="sheet-section phone-only">
       <span class="caps">Double toucher sur « Clic » (joystick)</span>
       <div class="ca-seg full" id="dblSeg">
         <button class="ca-seg__item" data-dbl="right">Clic droit</button>
         <button class="ca-seg__item" data-dbl="double">Double-clic</button>
       </div>
     </div>
-    <div class="sheet-section">
+    <div class="sheet-section phone-only">
       <span class="caps">Vitesse du joystick</span>
       <input type="range" id="joySpeed" min="0.4" max="3" step="0.1" value="1.2" class="range">
     </div>
-    <div class="sheet-section">
+    <div class="sheet-section phone-only">
       <span class="caps">Vitesse du trackpad</span>
       <input type="range" id="speed" min="0.5" max="3" step="0.1" value="1.4" class="range">
     </div>
@@ -212,6 +217,6 @@
     </div>
   </section>
 </div>
-<script src="/phone/app.js"></script>
+<script type="module" src="/client/app.js"></script>
 </body>
 </html>

@@ -399,3 +399,34 @@ h1 { font: var(--type-h1); font-size: 28px; letter-spacing: var(--ls-heading); m
 .dialog p { margin: 0 0 8px; color: var(--text-secondary); font: var(--type-label); font-weight: var(--fw-regular); font-size: 14px; line-height: 1.4; }
 .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #confirmScrim { z-index: 30; }
+
+/* ---------- 2.0 : pointer overlay, stats badge, desktop viewer ---------- */
+.cursor-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.frame video { display: block; width: 100%; height: 100%; pointer-events: none; object-fit: fill; }
+.stats-badge {
+  position: absolute; left: 10px; top: 10px; z-index: 4;
+  padding: 5px 10px; border-radius: var(--radius-pill);
+  background: rgba(20,20,22,.62); color: rgba(255,255,255,.9);
+  border: 1px solid rgba(255,255,255,.14);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  font-size: 11px; line-height: 1.2; white-space: nowrap; pointer-events: none;
+}
+.row-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font: var(--type-label); font-weight: var(--fw-regular); font-size: 14px; color: var(--text-primary);
+}
+.row-toggle input { width: 20px; height: 20px; accent-color: var(--violet-500); }
+.ca-seg.full .ca-seg__item .ca-icon { font-size: 15px; }
+.desktop-only { display: none; }
+
+/* The PC viewer: a real mouse, a real keyboard, the screen takes the whole window. */
+body.desktop .desktop-only { display: inline-flex; }
+body.desktop .phone-only { display: none; }
+body.desktop .toolbar, body.desktop .wheel, body.desktop .joypad, body.desktop .keys, body.desktop .panel-btn, body.desktop .safari-tip { display: none !important; }
+body.desktop .app { padding: 8px; }
+body.desktop .stage { cursor: none; border-radius: var(--radius-md); }
+body.desktop .stage:not(:focus-within) { cursor: default; }
+body.desktop .bar { height: 44px; }
+body.desktop .ripple-layer { display: none; }
+body.desktop .sheet { max-width: 440px; }
+body.desktop .sheet-section .shortcuts { grid-template-columns: repeat(8, 1fr); }

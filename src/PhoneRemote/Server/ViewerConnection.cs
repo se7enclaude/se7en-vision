@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using PhoneRemote.Core;
+using PhoneRemote.Cursor;
 using PhoneRemote.Input;
 using PhoneRemote.Media;
 using PhoneRemote.Media.Capture;
@@ -24,6 +26,7 @@ public sealed class ViewerConnection
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly SemaphoreSlim _frameWanted = new(0, 1);
     private readonly CancellationTokenSource _cts = new();
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
     private volatile bool _closing;
     private CancellationToken _ct;
 
@@ -33,6 +36,7 @@ public sealed class ViewerConnection
     // ---- viewer ----
     private int _version = 1;               // 2 once the viewer says hello
     private bool _phone = true;
+    private HashSet<string> _caps = new();
     private int _screen;                    // selected screen index (primary first)
     private bool _mosaic;
 
@@ -48,8 +52,23 @@ public sealed class ViewerConnection
     private bool _videoWanted;
     private QualityMode _mode = QualityMode.Balanced;
     private int _v1Width = 1280, _v1Kbps = 2500;
+    private BandwidthController? _bw;
+    private int _lastDropped;
+    private double _rttMs, _rttBase = double.NaN;
+    private int? _viewerFps;
+    private double? _viewerLoss;
+    private Task? _ticker;
+
+    // ---- cursor ----
+    private readonly CursorShapeCache _shapesSent = new();
+    private bool _cursorOn;
+    private long _lastCurMs;
+    private CursorState? _pendingCur;
 
     public string DeviceName { get; }
+    public string Transport { get; private set; } = "ws";
+    public VideoStats VideoStats => _video.Stats;
+    public (double Rtt, int Fps, int Kbps) ViewerStats { get; private set; }
 
     public ViewerConnection(WebSocket ws, HostServices host, string deviceName)
     {
@@ -68,6 +87,7 @@ public sealed class ViewerConnection
         {
             try
             {
+                if (code == 4002) { try { await SendText("{\"t\":\"bye\",\"why\":\"replaced\"}", _ct); } catch { } await Task.Delay(300); }
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
                 await _ws.CloseOutputAsync((WebSocketCloseStatus)code, reason, timeout.Token);
             }
@@ -83,6 +103,7 @@ public sealed class ViewerConnection
         _ct = ct;
         await SendInfo(ct);
         var sender = Task.Run(() => FrameLoop(ct), ct);
+        _ticker = Task.Run(() => TickLoop(ct), ct);
         try
         {
             await ReceiveLoop(ct);
@@ -99,7 +120,9 @@ public sealed class ViewerConnection
             _cts.Cancel();
             StopVideo();
             _video.Dispose();
+            CursorOff();
             try { await sender; } catch { }
+            try { if (_ticker != null) await _ticker; } catch { }
         }
     }
 
@@ -133,13 +156,15 @@ public sealed class ViewerConnection
         using var doc = JsonDocument.Parse(json);
         var m = doc.RootElement;
         string t = Json.Str(m, "t");
-        if (_closing && t is "move" or "abs" or "down" or "up" or "click" or "wheel" or "text" or "key" or "power") return;
+        if (_closing && t is "move" or "abs" or "down" or "up" or "click" or "wheel" or "text" or "key" or "power" or "kd" or "ku") return;
         switch (t)
         {
             case "hello":
                 _version = Math.Max(1, Json.Int(m, "v", 2));
                 _phone = Json.Str(m, "ua", "phone") != "desktop";
+                _caps = Json.Strings(m, "caps").ToHashSet();
                 await SendInfo(ct);
+                if (_caps.Contains("cur")) CursorOn();
                 break;
             case "move":
                 lock (_input) _input.MoveBy(Json.Num(m, "dx"), Json.Num(m, "dy"));
@@ -170,6 +195,10 @@ public sealed class ViewerConnection
             case "key":
                 lock (_input) _input.Key(Json.Str(m, "k"), Json.Strings(m, "mods"));
                 break;
+            case "kd":
+            case "ku":
+                lock (_input) _input.KeyCode(Json.Str(m, "c"), t == "kd");
+                break;
             case "frame":
                 _maxWidth = Math.Clamp(Json.Int(m, "w", _maxWidth), 480, 2560);
                 _quality = Math.Clamp(Json.Int(m, "q", _quality), 25, 90);
@@ -196,12 +225,36 @@ public sealed class ViewerConnection
                 _sink?.DropUntilKey();
                 _video.RequestKeyframe();
                 break;
+            case "curreq":
+            {
+                var shape = _host.Cursor.Shape(Json.Str(m, "s"));
+                if (shape != null) await SendShape(shape, ct);
+                break;
+            }
+            case "stat":
+            {
+                if (Json.Obj(m, "viewer") is { } v)
+                {
+                    _viewerFps = Json.Int(v, "fps", -1) is var f && f >= 0 ? f : null;
+                    _viewerLoss = Json.Num(v, "drop", -1) is var d && d >= 0 ? d : null;
+                    ViewerStats = (Json.Num(v, "rtt"), _viewerFps ?? 0, Json.Int(v, "kbps", 0));
+                    _host.NotifyChanged();
+                }
+                break;
+            }
             case "power":
                 await SendText("{\"t\":\"power\",\"ok\":true}", ct);
                 PowerActions.Run(Json.Str(m, "a"));
                 break;
             case "ping":
-                await SendText(JsonSerializer.Serialize(new { t = "pong", ts = Json.Num(m, "ts") }), ct);
+            {
+                double ts = Json.Num(m, "ts");
+                await SendText(JsonSerializer.Serialize(new { t = "pong", ts, hostTs = _clock.Elapsed.TotalMilliseconds }), ct);
+                break;
+            }
+            case "rtt":
+                _rttMs = Math.Max(0, Json.Num(m, "ms"));
+                if (double.IsNaN(_rttBase) || _rttMs < _rttBase) _rttBase = _rttMs;
                 break;
         }
     }
@@ -248,7 +301,7 @@ public sealed class ViewerConnection
         var screen = Displays.Get(_screen);
         var wanted = Protocol.CodecFromName(s.Codec) ?? VideoCodec.H264;
         var enc = (_host.Probe.Best(_version >= 2 ? wanted : VideoCodec.H264, s.Encoder) ?? EncoderCatalog.Find("libx264"))!;
-        bool drawMouse = true; // v2 viewers get the cursor on its own channel from M2 on
+        bool drawMouse = !_cursorOn; // v2 viewers draw the pointer themselves
         return _version >= 2
             ? QualityPlanner.Plan(_mode, screen, enc.Caps, s.FpsCap, _phone, drawMouse, s.PowerSaver)
             : QualityPlanner.PlanV1(_v1Width, _v1Kbps, screen, enc.Caps, s.FpsCap, drawMouse, s.PowerSaver);
@@ -266,9 +319,11 @@ public sealed class ViewerConnection
                 lock (_videoGate)
                 {
                     if (!_videoWanted || ct.IsCancellationRequested) return;
+                    _bw = new BandwidthController(plan);
                     if (_sink == null)
                     {
                         _sink = new WsVideoSink(SendBinary, ct) { V2 = _version >= 2 };
+                        _lastDropped = 0;
                         _video.Start(plan, _sink);
                     }
                     else _video.Apply(plan, "settings");
@@ -282,9 +337,51 @@ public sealed class ViewerConnection
     private void StopVideo()
     {
         WsVideoSink? sink;
-        lock (_videoGate) { sink = _sink; _sink = null; _videoWanted = _videoWanted && !_closing && !_ct.IsCancellationRequested && false; }
+        lock (_videoGate) { sink = _sink; _sink = null; _bw = null; }
         _video.Stop();
         sink?.Dispose();
+    }
+
+    /// <summary>Once a second: feed the bandwidth controller and apply its decision; send host stats to v2 viewers.</summary>
+    private async Task TickLoop(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(1000, ct);
+                BandwidthController? bw; WsVideoSink? sink; EncodePlan? plan;
+                lock (_videoGate) { bw = _bw; sink = _sink; plan = _video.Plan; }
+                var stats = _video.Stats;
+                if (bw != null && sink != null && plan != null)
+                {
+                    int dropped = sink.Dropped;
+                    double lossPct = Math.Min(100, (dropped - _lastDropped) * 100.0 / Math.Max(1, plan.Fps / 6.0)); // queue overflows per second, scaled
+                    _lastDropped = dropped;
+                    double? delay = !double.IsNaN(_rttBase) && _rttMs > 0 ? _rttMs - _rttBase : null;
+                    var sample = new LinkSample(null, _viewerLoss ?? (lossPct > 0 ? lossPct : null), delay, _viewerFps, stats.Kbps, (int)Math.Round(stats.Fps));
+                    var action = bw.Feed(sample, _clock.Elapsed.TotalSeconds);
+                    if (action != BandwidthAction.None)
+                    {
+                        var next = plan with { Kbps = bw.Kbps, Fps = bw.Fps };
+                        Log.Write($"Débit : {action} → {next.Kbps} kb/s, {next.Fps} i/s ({bw.EstimateSource})");
+                        _video.Apply(next, action is BandwidthAction.FpsDown or BandwidthAction.FpsUp ? "fps" : "bitrate");
+                    }
+                }
+                if (_version >= 2 && plan != null)
+                {
+                    await SendText(JsonSerializer.Serialize(new
+                    {
+                        t = "stat",
+                        host = new { fps = Math.Round(stats.Fps), kbps = stats.Kbps, enc = stats.Encoder, q = QualityPlanner.ModeName(_mode),
+                            restarts = stats.Restarts, target = plan.Kbps, bw = bw == null ? null : new { est = (int)bw.EstimateKbps, src = bw.EstimateSource } },
+                    }), ct);
+                }
+                _host.NotifyChanged();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) when (ex is WebSocketException or ObjectDisposedException) { }
     }
 
     private void OnVideoState(string state, string? detail)
@@ -332,22 +429,86 @@ public sealed class ViewerConnection
         });
     }
 
+    // ---- Cursor --------------------------------------------------------------
+
+    private void CursorOn()
+    {
+        if (_cursorOn) return;
+        _cursorOn = true;
+        _host.Cursor.NewShape += OnNewShape;
+        _host.Cursor.Changed += OnCursor;
+        _host.Cursor.Acquire();
+    }
+
+    private void CursorOff()
+    {
+        if (!_cursorOn) return;
+        _cursorOn = false;
+        _host.Cursor.Changed -= OnCursor;
+        _host.Cursor.NewShape -= OnNewShape;
+        _host.Cursor.Release();
+    }
+
+    private void OnNewShape(CursorShape shape)
+    {
+        if (_shapesSent.Seen(shape.Id)) return;
+        _ = SendShape(shape, _ct);
+    }
+
+    private Task SendShape(CursorShape shape, CancellationToken ct)
+    {
+        _shapesSent.Seen(shape.Id);
+        return SendText(JsonSerializer.Serialize(new { t = "curimg", s = shape.Id, w = shape.Width, h = shape.Height, hx = shape.HotX, hy = shape.HotY, png = Convert.ToBase64String(shape.Png) }), ct);
+    }
+
+    /// <summary>At most 120 positions a second: a change that comes too soon is sent at the next slot.</summary>
+    private void OnCursor(CursorState st)
+    {
+        if (_ct.IsCancellationRequested) return;
+        long now = _clock.ElapsedMilliseconds;
+        lock (_shapesSent)
+        {
+            if (now - _lastCurMs < 8)
+            {
+                bool schedule = _pendingCur == null;
+                _pendingCur = st;
+                if (schedule) _ = Task.Delay(8).ContinueWith(_ => { CursorState? p; lock (_shapesSent) { p = _pendingCur; _pendingCur = null; } if (p != null) OnCursor(p); });
+                return;
+            }
+            _lastCurMs = now;
+        }
+        if (st.ShapeId.Length > 0 && !_shapesSent.Seen(st.ShapeId))
+        {
+            var shape = _host.Cursor.Shape(st.ShapeId);
+            if (shape != null) _ = SendShape(shape, _ct);
+        }
+        _ = SendText($"{{\"t\":\"cur\",\"x\":{st.X},\"y\":{st.Y},\"s\":\"{st.ShapeId}\",\"v\":{(st.Visible ? "true" : "false")}}}", _ct);
+    }
+
     // ---- Sending -------------------------------------------------------------
 
     private Task SendInfo(CancellationToken ct)
     {
         var screens = Displays.All();
         var b = screens[Math.Clamp(_screen, 0, screens.Length - 1)];
-        object info = _version < 2
-            ? new { t = "info", screen = _screen, count = screens.Length, w = b.W, h = b.H, pc = Environment.MachineName }
-            : new
+        object info;
+        if (_version < 2)
+            info = new { t = "info", screen = _screen, count = screens.Length, w = b.W, h = b.H, pc = Environment.MachineName };
+        else
+        {
+            var s = _host.Settings;
+            var enc = _host.Probe.Best(Protocol.CodecFromName(s.Codec) ?? VideoCodec.H264, s.Encoder);
+            info = new
             {
                 t = "info", v = Protocol.Version, screen = _screen, count = screens.Length, w = b.W, h = b.H, pc = Environment.MachineName,
-                screens = screens.Select(s => new { i = s.Index, s.X, s.Y, w = s.W, h = s.H, hz = s.Hz, primary = s.Primary, name = s.Name }),
+                screens = screens.Select(x => new { i = x.Index, x = x.X, y = x.Y, w = x.W, h = x.H, hz = x.Hz, primary = x.Primary, name = x.Name }),
                 mosaic = _mosaic,
-                features = new[] { "stat" },
+                enc = enc == null ? null : new { id = enc.Id, codec = Protocol.CodecName(enc.Codec), gpu = enc.Gpu, maxFps = Math.Min(enc.MaxFps, s.FpsCap) },
+                features = new[] { "stat", "cur", "kd" },
                 quality = QualityPlanner.ModeName(_mode),
+                probing = !_host.Probe.Done,
             };
+        }
         return SendText(JsonSerializer.Serialize(info), ct);
     }
 

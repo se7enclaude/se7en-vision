@@ -13,7 +13,7 @@ namespace PhoneRemote.Server;
 
 /// <summary>
 /// Local web server (127.0.0.1 only) that the Cloudflare tunnel forwards to.
-/// Serves the phone page under the secret token and runs the control WebSocket.
+/// Serves the viewer page (iPhone or PC) under the secret token and runs the control WebSocket.
 /// </summary>
 public sealed class RemoteServer : IAsyncDisposable
 {
@@ -34,7 +34,7 @@ public sealed class RemoteServer : IAsyncDisposable
     {
         _session = session;
         _host = host;
-        _phoneFiles = new ManifestEmbeddedFileProvider(typeof(RemoteServer).Assembly, "wwwroot/phone");
+        _phoneFiles = new ManifestEmbeddedFileProvider(typeof(RemoteServer).Assembly, "wwwroot/client");
         _session.SessionRevoked += () => _current?.Close(4001, "revoked");
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
@@ -66,7 +66,8 @@ public sealed class RemoteServer : IAsyncDisposable
             h["Referrer-Policy"] = "no-referrer";
             await next();
         });
-        app.UseStaticFiles(new StaticFileOptions { FileProvider = _phoneFiles, RequestPath = "/phone" });
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = _phoneFiles, RequestPath = "/client" });
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = _phoneFiles, RequestPath = "/phone" }); // 1.4 bookmarks
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new ManifestEmbeddedFileProvider(typeof(RemoteServer).Assembly, "wwwroot/ds"),

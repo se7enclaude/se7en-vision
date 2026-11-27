@@ -6,7 +6,7 @@ namespace PhoneRemote.Input;
 /// <summary>Injects mouse and keyboard input into Windows with SendInput.</summary>
 public sealed class InputInjector
 {
-    private bool _leftDown, _rightDown;
+    private bool _leftDown, _rightDown, _middleDown;
     private readonly HashSet<ushort> _heldKeys = new();
 
     // ---- Mouse ---------------------------------------------------------------
@@ -39,13 +39,32 @@ public sealed class InputInjector
 
     public void Button(char button, bool down)
     {
-        bool left = button != 'r';
-        if (left) { if (_leftDown == down) return; _leftDown = down; }
-        else { if (_rightDown == down) return; _rightDown = down; }
-        uint flag = left
-            ? (down ? MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP)
-            : (down ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_RIGHTUP);
+        uint flag;
+        switch (button)
+        {
+            case 'r':
+                if (_rightDown == down) return; _rightDown = down;
+                flag = down ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_RIGHTUP;
+                break;
+            case 'm':
+                if (_middleDown == down) return; _middleDown = down;
+                flag = down ? MOUSEEVENTF_MIDDLEDOWN : MOUSEEVENTF_MIDDLEUP;
+                break;
+            default:
+                if (_leftDown == down) return; _leftDown = down;
+                flag = down ? MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP;
+                break;
+        }
         SendMouse(flag, 0, 0, 0);
+    }
+
+    /// <summary>A physical key (browser <c>KeyboardEvent.code</c>) pressed or released by a PC viewer.</summary>
+    public bool KeyCode(string code, bool down)
+    {
+        if (!KeyCodes.TryMap(code, out ushort vk, out _)) return false;
+        if (down && _heldKeys.Contains(vk)) return true; // key repeat: Windows repeats on its own
+        KeyRaw(vk, down);
+        return true;
     }
 
     public void Click(char button, int count = 1)
@@ -95,13 +114,14 @@ public sealed class InputInjector
     {
         Button('l', false);
         Button('r', false);
+        Button('m', false);
         foreach (var vk in _heldKeys.ToArray()) KeyRaw(vk, false);
     }
 
     private void KeyRaw(ushort vk, bool down)
     {
         uint flags = down ? 0 : KEYEVENTF_KEYUP;
-        if (ExtendedKeys.Contains(vk)) flags |= KEYEVENTF_EXTENDEDKEY;
+        if (ExtendedKeys.Contains(vk) || vk is 0x5C or 0x5D or 0xA3 or 0xA5 or 0x6F or 0x90 or 0xB2) flags |= KEYEVENTF_EXTENDEDKEY;
         ushort scan = (ushort)MapVirtualKey(vk, 0);
         var inputs = new[] { KeyInput(vk, scan, flags) };
         SendInput(1, inputs, Marshal.SizeOf<INPUT>());
@@ -163,7 +183,7 @@ public sealed class InputInjector
 
     private const uint INPUT_MOUSE = 0, INPUT_KEYBOARD = 1;
     private const uint MOUSEEVENTF_MOVE = 0x0001, MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004,
-        MOUSEEVENTF_RIGHTDOWN = 0x0008, MOUSEEVENTF_RIGHTUP = 0x0010, MOUSEEVENTF_WHEEL = 0x0800,
+        MOUSEEVENTF_RIGHTDOWN = 0x0008, MOUSEEVENTF_RIGHTUP = 0x0010, MOUSEEVENTF_MIDDLEDOWN = 0x0020, MOUSEEVENTF_MIDDLEUP = 0x0040, MOUSEEVENTF_WHEEL = 0x0800,
         MOUSEEVENTF_HWHEEL = 0x1000, MOUSEEVENTF_VIRTUALDESK = 0x4000, MOUSEEVENTF_ABSOLUTE = 0x8000;
     private const uint KEYEVENTF_EXTENDEDKEY = 0x0001, KEYEVENTF_KEYUP = 0x0002, KEYEVENTF_UNICODE = 0x0004;
 
