@@ -16,8 +16,8 @@ public class BandwidthTests
         for (; t < 12; t++) Assert.Equal(BandwidthAction.None, c.Feed(new LinkSample(RembBps: 6_000_000, SentKbps: c.Kbps, SentFps: 60), t));
         Assert.Equal(BandwidthAction.Down, c.Feed(new LinkSample(RembBps: 3_500_000, SentKbps: c.Kbps, SentFps: 60), t++));
         Assert.Equal(3000, c.Kbps); // 3.5 Mb/s × 0.85 < floor → floor
-        // the link recovers: no change before five clean seconds and ten seconds since the drop
-        for (int i = 0; i < 9; i++) Assert.Equal(BandwidthAction.None, c.Feed(new LinkSample(RembBps: 9_000_000, SentKbps: c.Kbps, SentFps: 60), t++));
+        // the link recovers: no change before five clean seconds since the drop (a receiver estimate is trusted quickly)
+        for (int i = 0; i < 4; i++) Assert.Equal(BandwidthAction.None, c.Feed(new LinkSample(RembBps: 9_000_000, SentKbps: c.Kbps, SentFps: 60), t++));
         Assert.Equal(BandwidthAction.Up, c.Feed(new LinkSample(RembBps: 9_000_000, SentKbps: c.Kbps, SentFps: 60), t++));
         Assert.InRange(c.Kbps, 3001, 3750); // +25 % at most
         Assert.Equal("remb", c.EstimateSource);

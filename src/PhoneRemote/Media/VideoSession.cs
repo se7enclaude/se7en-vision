@@ -46,6 +46,13 @@ public sealed class VideoSession : IDisposable
         Apply(plan, "start");
     }
 
+    /// <summary>Sends the pictures somewhere else from now on (direct link up or down). The new sink starts at a keyframe.</summary>
+    public void SetSink(IVideoSink sink)
+    {
+        lock (_gate) { if (_stopped) return; _sink = sink; }
+        RequestKeyframe();
+    }
+
     /// <summary>Applies a new plan (restart with overlap). Does nothing when the plan is the same.</summary>
     public void Apply(EncodePlan plan, string why)
     {

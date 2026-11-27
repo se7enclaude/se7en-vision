@@ -34,6 +34,14 @@ internal static class Program
             return;
         }
 
+        // Support: the direct link (WebRTC) end to end on this PC, without a browser.
+        if (args.Contains("--selftest"))
+        {
+            AttachConsole(-1);
+            Environment.ExitCode = Rtc.SelfTest.RunBlocking();
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
 
         // Unexpected error: let go of every key/button the viewer held, log it, tell the user.

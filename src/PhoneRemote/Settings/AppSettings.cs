@@ -20,6 +20,8 @@ public sealed class AppSettings
     /// <summary>ddagrab dup_frames=0: no frame while nothing changes on screen.</summary>
     public bool PowerSaver { get; set; }
     public bool Rtc { get; set; } = true;
+    /// <summary>Offer every local address as an ICE candidate (VPN, several network cards). Off: the main one only.</summary>
+    public bool RtcAllInterfaces { get; set; }
     public bool Clipboard { get; set; }
     public bool OverlayVisible { get; set; } = true;
     public bool ProbeAll { get; set; }
@@ -69,6 +71,7 @@ public sealed class AppSettings
             case "downloadsDir": DownloadsDir = value.GetString() ?? ""; break;
             case "powerSaver": PowerSaver = value.ValueKind == JsonValueKind.True; break;
             case "rtc": Rtc = value.ValueKind == JsonValueKind.True; break;
+            case "rtcAllInterfaces": RtcAllInterfaces = value.ValueKind == JsonValueKind.True; break;
             case "clipboard": Clipboard = value.ValueKind == JsonValueKind.True; break;
             case "overlayVisible": OverlayVisible = value.ValueKind == JsonValueKind.True; break;
             case "probeAll": ProbeAll = value.ValueKind == JsonValueKind.True; break;

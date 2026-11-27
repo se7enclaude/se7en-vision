@@ -21,7 +21,7 @@ public sealed class BandwidthController
     private readonly int _floor, _ceiling, _maxFps;
     private int _kbps, _fps;
     private int _cleanSeconds, _downsAtFloor, _cleanSinceFpsDown;
-    private double _lastChangeAt = -100, _now;
+    private double _lastChangeAt = -100, _now, _startAt = double.NaN;
     private double _lossEma, _delayEma, _lastRemb = double.NaN, _rembAt = -100;
 
     public int Kbps => _kbps;
@@ -40,6 +40,7 @@ public sealed class BandwidthController
     public BandwidthAction Feed(LinkSample s, double nowSeconds)
     {
         _now = nowSeconds;
+        if (double.IsNaN(_startAt)) _startAt = nowSeconds;
         if (s.RembBps is { } remb && remb > 0) { _lastRemb = remb / 1000.0; _rembAt = nowSeconds; }
         if (s.LossPercent is { } loss) _lossEma = _lossEma * 0.6 + loss * 0.4;
         if (s.DelayDeltaMs is { } d) _delayEma = _delayEma * 0.7 + d * 0.3;
@@ -57,8 +58,10 @@ public sealed class BandwidthController
         double sinceChange = nowSeconds - _lastChangeAt;
         int target = est is { } t ? (int)Math.Clamp(t * 0.85, _floor, _ceiling) : _kbps;
 
-        // a receiver estimate wobbles: only a clear drop counts; loss or delay growth: any drop counts
-        bool wantDown = est != null && (EstimateSource == "remb" ? target < _kbps * 0.8 : target < _kbps);
+        // a receiver estimate wobbles, and a browser's first ones are low while it warms up (3 s): only a clear,
+        // settled drop counts; loss or delay growth: any drop counts
+        bool rembWarm = nowSeconds - _startAt >= 3;
+        bool wantDown = est != null && (EstimateSource == "remb" ? rembWarm && target < _kbps * 0.8 : target < _kbps);
         bool starvingAtFloor = est is { } e3 && _kbps == _floor && e3 * 0.85 < _floor;
         if ((wantDown || starvingAtFloor) && (sinceChange >= 10 || (heavyLoss && sinceChange >= 2)))
         {
@@ -72,14 +75,17 @@ public sealed class BandwidthController
         if (est == null || target >= _kbps) _cleanSeconds++; else _cleanSeconds = 0;
         if (!congested && !starving) _cleanSinceFpsDown++; else _cleanSinceFpsDown = 0;
 
-        if (_fps < _maxFps && _cleanSinceFpsDown >= 20 && sinceChange >= 10)
+        if (_fps < _maxFps && _cleanSinceFpsDown >= 20 && sinceChange >= 5)
         {
             _fps = _maxFps;
             _lastChangeAt = nowSeconds;
             _cleanSinceFpsDown = 0;
             return BandwidthAction.FpsUp;
         }
-        if (_cleanSeconds >= 5 && sinceChange >= 10 && _kbps < _ceiling && (est == null ? _lossEma < 1 && _delayEma < 20 : target > _kbps * 1.25))
+        // a receiver estimate is capped near what it receives: a little headroom is all it can ever show
+        bool headroom = est == null ? _lossEma < 1 && _delayEma < 20 : EstimateSource == "remb" ? target > _kbps * 1.1 : target > _kbps * 1.25;
+        double upWait = EstimateSource == "remb" ? 5 : 10;
+        if (_cleanSeconds >= 5 && sinceChange >= upWait && _kbps < _ceiling && headroom)
         {
             int up = (int)Math.Min(_ceiling, Math.Max(_kbps * 1.25, _kbps + 250));
             if (est is { } e2) up = Math.Min(up, Math.Max(_kbps, (int)(e2 * 0.85)));

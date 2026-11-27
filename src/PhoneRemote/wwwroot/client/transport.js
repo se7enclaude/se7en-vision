@@ -32,6 +32,7 @@ export function createTransport(ws) {
     get mode() { return mode; },
     set mode(m) { mode = m; },
     attach(name, dc) { channels[name] = dc; },
+    detach(name) { delete channels[name]; },
     detachAll() { for (const k of Object.keys(channels)) delete channels[k]; mode = 'ws'; },
     channel(name) { return channels[name]; },
   };

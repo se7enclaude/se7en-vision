@@ -2,11 +2,13 @@ using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 using PhoneRemote.Core;
 using PhoneRemote.Cursor;
 using PhoneRemote.Input;
 using PhoneRemote.Media;
 using PhoneRemote.Media.Capture;
+using PhoneRemote.Rtc;
 using PhoneRemote.Tools;
 
 namespace PhoneRemote.Server;
@@ -48,7 +50,8 @@ public sealed class ViewerConnection
     // ---- video ----
     private readonly object _videoGate = new();
     private readonly VideoSession _video;
-    private WsVideoSink? _sink;
+    private IViewerSink? _sink;
+    private string _via = "ws";             // where the viewer wants the video: "ws" or "rtc"
     private bool _videoWanted;
     private QualityMode _mode = QualityMode.Balanced;
     private int _v1Width = 1280, _v1Kbps = 2500;
@@ -59,6 +62,10 @@ public sealed class ViewerConnection
     private double? _viewerLoss;
     private Task? _ticker;
 
+    // ---- direct link (WebRTC) ----
+    private PeerSession? _rtc;
+    private readonly Channel<string> _dcInbox = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+
     // ---- cursor ----
     private readonly CursorShapeCache _shapesSent = new();
     private bool _cursorOn;
@@ -66,7 +73,7 @@ public sealed class ViewerConnection
     private CursorState? _pendingCur;
 
     public string DeviceName { get; }
-    public string Transport { get; private set; } = "ws";
+    public string Transport => _sink?.Via == "rtc" ? (_rtc?.Path == "local" ? "local" : "rtc") : "ws";
     public VideoStats VideoStats => _video.Stats;
     public (double Rtt, int Fps, int Kbps) ViewerStats { get; private set; }
 
@@ -104,6 +111,7 @@ public sealed class ViewerConnection
         await SendInfo(ct);
         var sender = Task.Run(() => FrameLoop(ct), ct);
         _ticker = Task.Run(() => TickLoop(ct), ct);
+        var dcPump = Task.Run(() => DataChannelLoop(ct), ct);
         try
         {
             await ReceiveLoop(ct);
@@ -121,6 +129,9 @@ public sealed class ViewerConnection
             StopVideo();
             _video.Dispose();
             CursorOff();
+            PeerSession? rtc; lock (_videoGate) { rtc = _rtc; _rtc = null; }
+            rtc?.Dispose();
+            try { await dcPump; } catch { }
             try { await sender; } catch { }
             try { if (_ticker != null) await _ticker; } catch { }
         }
@@ -215,11 +226,15 @@ public sealed class ViewerConnection
                 _v1Width = Math.Clamp(Json.Int(m, "w", _v1Width), 640, 2560);
                 _v1Kbps = Math.Clamp(Json.Int(m, "kbps", _v1Kbps), 500, 12000);
                 if (m.TryGetProperty("mode", out _)) _mode = QualityPlanner.ParseMode(Json.Str(m, "mode"));
+                if (m.TryGetProperty("via", out _)) _via = Json.Str(m, "via") == "rtc" ? "rtc" : "ws";
                 bool on = Json.Bool(m, "on");
                 lock (_videoGate) _videoWanted = on;
                 if (on) StartVideo(); else StopVideo();
                 break;
             }
+            case "rtc":
+                await HandleRtc(m, ct);
+                break;
             case "keyframe":
                 // The viewer fell behind or lost its decoder: resume at the next keyframe.
                 _sink?.DropUntilKey();
@@ -300,6 +315,8 @@ public sealed class ViewerConnection
         var s = _host.Settings;
         var screen = Displays.Get(_screen);
         var wanted = Protocol.CodecFromName(s.Codec) ?? VideoCodec.H264;
+        PeerSession? rtc; lock (_videoGate) rtc = _rtc;
+        if (_via == "rtc" && rtc is { Connected: true }) wanted = rtc.Codec; // the track was negotiated for one codec
         var enc = (_host.Probe.Best(_version >= 2 ? wanted : VideoCodec.H264, s.Encoder) ?? EncoderCatalog.Find("libx264"))!;
         bool drawMouse = !_cursorOn; // v2 viewers draw the pointer themselves
         return _version >= 2
@@ -320,13 +337,18 @@ public sealed class ViewerConnection
                 {
                     if (!_videoWanted || ct.IsCancellationRequested) return;
                     _bw = new BandwidthController(plan);
+                    var sink = PickSink(ct);
                     if (_sink == null)
                     {
-                        _sink = new WsVideoSink(SendBinary, ct) { V2 = _version >= 2 };
+                        _sink = sink;
                         _lastDropped = 0;
                         _video.Start(plan, _sink);
                     }
-                    else _video.Apply(plan, "settings");
+                    else
+                    {
+                        if (sink != _sink) { var old = _sink; _sink = sink; _lastDropped = 0; _video.SetSink(sink); old.Dispose(); Log.Write("Vidéo via " + sink.Via); }
+                        _video.Apply(plan, "settings");
+                    }
                 }
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException) { }
@@ -334,9 +356,32 @@ public sealed class ViewerConnection
         });
     }
 
+    /// <summary>The direct link when the viewer asked for it and it is up, otherwise the WebSocket queue. Reuses the current sink when it already fits.</summary>
+    private IViewerSink PickSink(CancellationToken ct)
+    {
+        bool rtc = _via == "rtc" && _rtc is { Connected: true };
+        if (_sink != null && (_sink.Via == "rtc") == rtc) return _sink;
+        return rtc ? new RtcVideoSink(_rtc!) : new WsVideoSink(SendBinary, ct) { V2 = _version >= 2 };
+    }
+
+    /// <summary>The direct link went down while it carried the video: back to the WebSocket without the viewer asking.</summary>
+    private void FallBackToWs()
+    {
+        lock (_videoGate)
+        {
+            if (_sink is not { Via: "rtc" } || !_videoWanted) return;
+            _via = "ws";
+            var sink = new WsVideoSink(SendBinary, _ct) { V2 = _version >= 2 };
+            var old = _sink; _sink = sink; _lastDropped = 0;
+            _video.SetSink(sink);
+            old.Dispose();
+        }
+        Log.Write("Connexion directe perdue : vidéo via le tunnel");
+    }
+
     private void StopVideo()
     {
-        WsVideoSink? sink;
+        IViewerSink? sink;
         lock (_videoGate) { sink = _sink; _sink = null; _bw = null; }
         _video.Stop();
         sink?.Dispose();
@@ -350,8 +395,8 @@ public sealed class ViewerConnection
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(1000, ct);
-                BandwidthController? bw; WsVideoSink? sink; EncodePlan? plan;
-                lock (_videoGate) { bw = _bw; sink = _sink; plan = _video.Plan; }
+                BandwidthController? bw; IViewerSink? sink; EncodePlan? plan; PeerSession? rtc;
+                lock (_videoGate) { bw = _bw; sink = _sink; plan = _video.Plan; rtc = _rtc; }
                 var stats = _video.Stats;
                 if (bw != null && sink != null && plan != null)
                 {
@@ -359,7 +404,13 @@ public sealed class ViewerConnection
                     double lossPct = Math.Min(100, (dropped - _lastDropped) * 100.0 / Math.Max(1, plan.Fps / 6.0)); // queue overflows per second, scaled
                     _lastDropped = dropped;
                     double? delay = !double.IsNaN(_rttBase) && _rttMs > 0 ? _rttMs - _rttBase : null;
-                    var sample = new LinkSample(null, _viewerLoss ?? (lossPct > 0 ? lossPct : null), delay, _viewerFps, stats.Kbps, (int)Math.Round(stats.Fps));
+                    LinkSample sample;
+                    if (sink.Via == "rtc" && rtc != null)
+                    {
+                        var (remb, loss, _) = rtc.TakeSample();
+                        sample = new LinkSample(remb, loss ?? _viewerLoss, null, _viewerFps, stats.Kbps, (int)Math.Round(stats.Fps));
+                    }
+                    else sample = new LinkSample(null, _viewerLoss ?? (lossPct > 0 ? lossPct : null), delay, _viewerFps, stats.Kbps, (int)Math.Round(stats.Fps));
                     var action = bw.Feed(sample, _clock.Elapsed.TotalSeconds);
                     if (action != BandwidthAction.None)
                     {
@@ -370,12 +421,12 @@ public sealed class ViewerConnection
                 }
                 if (_version >= 2 && plan != null)
                 {
-                    await SendText(JsonSerializer.Serialize(new
+                    await SendJson(JsonSerializer.Serialize(new
                     {
                         t = "stat",
-                        host = new { fps = Math.Round(stats.Fps), kbps = stats.Kbps, enc = stats.Encoder, q = QualityPlanner.ModeName(_mode),
+                        host = new { fps = Math.Round(stats.Fps), kbps = stats.Kbps, enc = stats.Encoder, q = QualityPlanner.ModeName(_mode), via = sink?.Via ?? "ws",
                             restarts = stats.Restarts, target = plan.Kbps, bw = bw == null ? null : new { est = (int)bw.EstimateKbps, src = bw.EstimateSource } },
-                    }), ct);
+                    }), "stat", ct);
                 }
                 _host.NotifyChanged();
             }
@@ -482,7 +533,7 @@ public sealed class ViewerConnection
             var shape = _host.Cursor.Shape(st.ShapeId);
             if (shape != null) _ = SendShape(shape, _ct);
         }
-        _ = SendText($"{{\"t\":\"cur\",\"x\":{st.X},\"y\":{st.Y},\"s\":\"{st.ShapeId}\",\"v\":{(st.Visible ? "true" : "false")}}}", _ct);
+        _ = SendJson($"{{\"t\":\"cur\",\"x\":{st.X},\"y\":{st.Y},\"s\":\"{st.ShapeId}\",\"v\":{(st.Visible ? "true" : "false")}}}", "cur", _ct);
     }
 
     // ---- Sending -------------------------------------------------------------
@@ -504,13 +555,95 @@ public sealed class ViewerConnection
                 screens = screens.Select(x => new { i = x.Index, x = x.X, y = x.Y, w = x.W, h = x.H, hz = x.Hz, primary = x.Primary, name = x.Name }),
                 mosaic = _mosaic,
                 enc = enc == null ? null : new { id = enc.Id, codec = Protocol.CodecName(enc.Codec), gpu = enc.Gpu, maxFps = Math.Min(enc.MaxFps, s.FpsCap) },
-                features = new[] { "stat", "cur", "kd" },
+                features = s.Rtc ? new[] { "stat", "cur", "kd", "rtc" } : new[] { "stat", "cur", "kd" },
                 quality = QualityPlanner.ModeName(_mode),
                 probing = !_host.Probe.Done,
             };
         }
         return SendText(JsonSerializer.Serialize(info), ct);
     }
+
+    /// <summary>Small control messages take the matching data channel when the direct link is up, the WebSocket otherwise.</summary>
+    private Task SendJson(string json, string channel, CancellationToken ct)
+    {
+        PeerSession? rtc; lock (_videoGate) rtc = _rtc;
+        if (rtc != null && rtc.SendData(channel, json)) return Task.CompletedTask;
+        return SendText(json, ct);
+    }
+
+    // ---- Direct link (WebRTC) ----------------------------------------------
+
+    private async Task HandleRtc(JsonElement m, CancellationToken ct)
+    {
+        string sub = Json.Str(m, "sub");
+        var s = _host.Settings;
+        switch (sub)
+        {
+            case "offer":
+            {
+                if (!s.Rtc) { await SendText("{\"t\":\"rtc\",\"sub\":\"fail\",\"why\":\"disabled\"}", ct); return; }
+                PeerSession? old;
+                var peer = new PeerSession(s.AllowHevcRtc, s.RtcAllInterfaces);
+                lock (_videoGate) { old = _rtc; _rtc = peer; }
+                old?.Dispose();
+                peer.Ice += json => _ = SendText("{\"t\":\"rtc\",\"sub\":\"ice\",\"cand\":" + json + "}", _ct);
+                peer.StateChanged += state =>
+                {
+                    Log.Write("Connexion directe : " + state + (peer.Path.Length > 0 ? " (" + peer.Path + ")" : ""));
+                    _ = SendText(JsonSerializer.Serialize(new { t = "rtc", sub = "state", s = state, path = peer.Path }), _ct);
+                    if (state is "failed" or "closed" or "disconnected") FallBackToWs();
+                    else if (state == "connected" && _via == "rtc" && VideoWanted) StartVideo();
+                    _host.NotifyChanged();
+                };
+                peer.KeyframeWanted += () => { _sink?.DropUntilKey(); _video.RequestKeyframe(); };
+                peer.DataText += (_, text) => _dcInbox.Writer.TryWrite(text);
+                peer.DataBinary += (_ch, data) => { _ = HandleBinary(data, _ct); };
+                try
+                {
+                    var answer = await peer.AcceptOffer(Json.Str(m, "sdp"));
+                    await SendText(JsonSerializer.Serialize(new { t = "rtc", sub = "answer", sdp = answer }), ct);
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Connexion directe refusée : " + ex.Message);
+                    lock (_videoGate) if (_rtc == peer) _rtc = null;
+                    peer.Dispose();
+                    await SendText(JsonSerializer.Serialize(new { t = "rtc", sub = "fail", why = ex.Message }), ct);
+                }
+                break;
+            }
+            case "ice":
+            {
+                PeerSession? rtc; lock (_videoGate) rtc = _rtc;
+                if (rtc != null && m.TryGetProperty("cand", out var cand) && cand.ValueKind == JsonValueKind.Object) rtc.AddIce(cand.GetRawText());
+                break;
+            }
+            case "close":
+            {
+                PeerSession? rtc; lock (_videoGate) { rtc = _rtc; _rtc = null; }
+                FallBackToWs();
+                rtc?.Dispose();
+                break;
+            }
+        }
+    }
+
+    /// <summary>Messages from the data channels, handled one at a time like the WebSocket ones.</summary>
+    private async Task DataChannelLoop(CancellationToken ct)
+    {
+        try
+        {
+            await foreach (var text in _dcInbox.Reader.ReadAllAsync(ct))
+            {
+                try { await Handle(Encoding.UTF8.GetBytes(text), ct); }
+                catch (JsonException) { }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>Binary from a data channel (file chunks, later).</summary>
+    private Task HandleBinary(byte[] data, CancellationToken ct) => Task.CompletedTask;
 
     private async Task SendText(string text, CancellationToken ct)
     {

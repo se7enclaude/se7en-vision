@@ -8,7 +8,15 @@ namespace PhoneRemote.Server;
 /// keyframe (a delta frame without its predecessors cannot be decoded). v1 viewers get the 1-byte prefix,
 /// v2 viewers the extended frame with codec and timestamp.
 /// </summary>
-public sealed class WsVideoSink : IVideoSink, IDisposable
+/// <summary>A video sink a viewer connection can swap at run time (WebSocket queue or WebRTC track).</summary>
+public interface IViewerSink : IVideoSink, IDisposable
+{
+    int Dropped { get; }
+    string Via { get; }
+    void DropUntilKey();
+}
+
+public sealed class WsVideoSink : IViewerSink
 {
     private const int QueueMax = 6;
     private readonly Func<byte[], CancellationToken, Task> _send;
@@ -19,6 +27,7 @@ public sealed class WsVideoSink : IVideoSink, IDisposable
     private readonly Task _loop;
     private bool _dropping = true, _disposed;
     public bool V2 { get; set; }
+    public string Via => "ws";
     public int Dropped { get; private set; }
     public long Sent { get; private set; }
 

@@ -9,6 +9,7 @@ import { supportedCodecs, createWebCodecsDecoder, createJpeg } from './decoder.j
 import { createCursor } from './cursor.js';
 import { createStats } from './stats.js';
 import { createInput } from './input.js';
+import { createRtc, rtcPossible } from './rtc.js';
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.replace(/\/+$/, '');
@@ -158,10 +159,46 @@ const ws = createWs({ base, onOpen, onText, onBinary, onClose });
 const transport = createTransport(ws);
 const send = (obj) => transport.send(obj);
 
-const stats = createStats({ badge: $('statsBadge'), send, ws, getRtcStats: null });
+const stats = createStats({ badge: $('statsBadge'), send, ws, getRtcStats: () => rtc.getStats() });
 stats.shown = store.get('stats', '0') === '1';
 $('statsToggle').checked = stats.shown;
 $('statsToggle').addEventListener('change', () => { stats.shown = $('statsToggle').checked; store.set('stats', stats.shown ? '1' : '0'); });
+
+// ---------- Direct link ----------
+let via = 'ws';
+let rtcWanted = rtcPossible && store.get('rtc', '1') === '1';
+const rtcVideo = $('rtcVideo');
+const rtc = createRtc({
+  signal: (m) => ws.send(m), transport, videoEl: rtcVideo, onText, onBinary, allowHevc: false,
+  onState: (s, x) => {
+    if (s === 'connected') {
+      via = 'rtc'; transport.mode = 'rtc'; stats.mode = 'rtc'; stats.path = x.path;
+      hint(x.path === 'local' ? 'Connexion directe (réseau local)' : 'Connexion directe établie');
+      if (video.active) { showSurface('rtc'); send({ t: 'video', on: true, mode: quality, via: 'rtc' }); }
+    } else if (s === 'failed') {
+      const had = via === 'rtc';
+      via = 'ws'; transport.mode = 'ws'; stats.mode = 'ws'; stats.path = '';
+      if (x.why === 'disabled' || x.why === 'refused') rtcWanted = false;
+      else if (x.was !== 'connected') hint('Pas de chemin direct : passage par le tunnel');
+      else hint('Connexion directe perdue : passage par le tunnel');
+      if (video.active) { showSurface('ws'); decoder.close(); send({ t: 'video', on: true, mode: quality, via: 'ws' }); }
+    }
+    renderLive();
+  },
+});
+rtcVideo.addEventListener('resize', () => { if (via === 'rtc' && rtcVideo.videoWidth && !layout.mosaic && !(info && info.w === rtcVideo.videoWidth)) layout.setImage(rtcVideo.videoWidth, rtcVideo.videoHeight); });
+function maybeStartRtc() {
+  if (!hostV2 || !rtcWanted || !alive || rtc.state === 'connecting' || rtc.state === 'connected') return;
+  if (!(info && Array.isArray(info.features) && info.features.includes('rtc'))) return;
+  rtc.start();
+}
+$('rtcToggle').checked = rtcWanted;
+$('rtcToggle').addEventListener('change', () => {
+  rtcWanted = rtcPossible && $('rtcToggle').checked;
+  store.set('rtc', rtcWanted ? '1' : '0');
+  if (!rtcWanted && rtc.state !== 'idle') { send({ t: 'rtc', sub: 'close' }); rtc.stop(); via = 'ws'; transport.mode = 'ws'; stats.mode = 'ws'; if (video.active) { showSurface('ws'); send({ t: 'video', on: true, mode: quality, via: 'ws' }); } }
+  else maybeStartRtc();
+});
 
 const cursor = createCursor({ canvas: $('cursorLayer'), layout, getScreens: () => (info && info.screens) || null, send });
 
@@ -186,6 +223,8 @@ function connect() {
 }
 function stopSession() {
   ws.stop();
+  rtc.stop();
+  via = 'ws'; transport.mode = 'ws'; stats.mode = 'ws';
   alive = false;
   resetVideo();
   cursor.reset();
@@ -196,7 +235,7 @@ async function onOpen() {
   setLive(true, '');
   codecs = await codecsReady;
   send({
-    t: 'hello', v: 2, ua: isDesktop ? 'desktop' : 'phone', rtc: false, codecs,
+    t: 'hello', v: 2, ua: isDesktop ? 'desktop' : 'phone', rtc: rtcWanted, codecs,
     screen: { w: screen.width, h: screen.height, dpr: window.devicePixelRatio || 1 },
     caps: ['cur', 'stat', 'kd'],
   });
@@ -211,6 +250,7 @@ function onText(m) {
     case 'cur': cursor.onMove(m); break;
     case 'curimg': cursor.onShape(m); break;
     case 'stat': if (m.host) { stats.host = m.host; hostStat = m.host; renderLive(); } break;
+    case 'rtc': rtc.onMessage(m); break;
     case 'power': onPowerAck(); break;
     case 'bye': byeWhy = m.why || ''; break;
   }
@@ -223,6 +263,8 @@ function onBinary(bytes) {
 function onClose(code) {
   alive = false; framePending = false;
   resetVideo();
+  rtc.stop();
+  via = 'ws'; transport.mode = 'ws'; stats.mode = 'ws';
   cursor.enabled = false;
   if (powerPending) return powerDone();
   if (code === 4001) return message('Accès fermé', 'Le PC a coupé l’accès. Scanne le nouveau QR code affiché sur l’écran.', { icon: 'unplug' });
@@ -244,7 +286,7 @@ function setLive(on, text) {
 }
 function renderLive() {
   const s = stats.summary;
-  let text = ws.rtt + ' ms';
+  let text = (via === 'rtc' && s.rtt != null ? s.rtt : ws.rtt) + ' ms';
   if (video.active && s.fps) text += ' · ' + s.fps + ' i/s';
   if (hostStat && hostStat.plan && hostStat.plan.h) text += ' · ' + hostStat.plan.h + 'p';
   setLive(true, text);
@@ -262,6 +304,8 @@ function onInfo(m) {
   renderQuality();
   renderScreens(m);
   cursor.enabled = hostV2 && Array.isArray(m.features) && m.features.includes('cur');
+  $('rtcToggle').closest('label').hidden = !(hostV2 && Array.isArray(m.features) && m.features.includes('rtc') && rtcPossible);
+  maybeStartRtc();
   stats.host = m.enc ? { enc: m.enc.id } : null;
   $('statsToggle').closest('label').hidden = !hostV2;
   if (m.enc) $('qualityHint').textContent = qualityText(m);
@@ -297,8 +341,15 @@ let videoSupported = false;
 codecsReady.then((c) => { videoSupported = c.length > 0; renderImageMode(); });
 
 const shot = $('shot'), canvas = $('vid');
+// which element shows the picture: 'jpeg' (img), 'ws' (canvas, WebCodecs) or 'rtc' (<video>)
+function showSurface(which) {
+  shot.hidden = which !== 'jpeg';
+  canvas.hidden = which !== 'ws';
+  rtcVideo.hidden = which !== 'rtc';
+  if (which === 'rtc') $('stageMsg').hidden = true;
+}
 const jpeg = createJpeg({ img: shot, onShown: (w, h) => {
-  if (w) { $('stageMsg').hidden = true; if (!video.active) { shot.hidden = false; canvas.hidden = true; } }
+  if (w) { $('stageMsg').hidden = true; if (!video.active) showSurface('jpeg'); }
   framePending = false;
   requestFrame();
 } });
@@ -313,7 +364,7 @@ const decoder = createWebCodecsDecoder({
   canvas,
   onFrame: (w, h) => {
     stats.onFrame();
-    if (canvas.hidden) { canvas.hidden = false; shot.hidden = true; $('stageMsg').hidden = true; }
+    if (canvas.hidden && via !== 'rtc') { showSurface('ws'); $('stageMsg').hidden = true; }
     if (!layout.mosaic && (w !== layout.imgW || h !== layout.imgH) && !info) layout.setImage(w, h);
   },
   onNeedKey: () => send({ t: 'keyframe' }),
@@ -330,7 +381,8 @@ function startVideo() {
   framePending = false;
   // 1.4 PCs read w/kbps; 2.0 PCs read mode
   const v1 = { fast: { w: 1280, kbps: 2500 }, balanced: { w: 1600, kbps: 4000 }, sharp: { w: 1920, kbps: 8000 } }[quality];
-  send({ t: 'video', on: true, mode: quality, ...v1 });
+  if (via === 'rtc') showSurface('rtc');
+  send({ t: 'video', on: true, mode: quality, via, ...v1 });
 }
 function resetVideo() {
   video.active = false;
@@ -366,7 +418,7 @@ function renderQuality() {
 document.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => {
   quality = b.dataset.q; store.set('quality', quality); renderQuality();
   if (video.active) {
-    if (hostV2) send({ t: 'video', on: true, mode: quality }); else startVideo();
+    if (hostV2) send({ t: 'video', on: true, mode: quality, via }); else startVideo();
   }
   hint(b.textContent.trim());
 }));
