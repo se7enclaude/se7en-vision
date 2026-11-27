@@ -23,6 +23,7 @@ public sealed class MainForm : Form
     private readonly Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider _types = new();
     private bool _webReady;
     private string? _qrFor, _qrSvg;
+    private readonly List<ViewerForm> _viewers = new();
 
     public MainForm(SessionManager session, RemoteServer server, CloudflareTunnel tunnel, HostServices host)
     {
@@ -97,12 +98,13 @@ public sealed class MainForm : Form
 
     private void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
-        string type, pin = "";
+        string type, pin = "", url = "";
         try
         {
             using var doc = JsonDocument.Parse(e.WebMessageAsJson);
             type = doc.RootElement.GetProperty("type").GetString() ?? "";
             if (doc.RootElement.TryGetProperty("pin", out var p)) pin = p.GetString() ?? "";
+            if (doc.RootElement.TryGetProperty("url", out var u)) url = (u.GetString() ?? "").Trim();
         }
         catch { return; }
 
@@ -126,10 +128,46 @@ public sealed class MainForm : Form
                 _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new { type = "pinSaved", ok = error == null, error }));
                 break;
             case "copy":
-                var url = CurrentLink();
-                if (url != null) Clipboard.SetText(url);
+                var link = CurrentLink();
+                if (link != null) Clipboard.SetText(link);
+                break;
+            case "connect":
+                Connect(url);
+                break;
+            case "forget":
+                if (_host.Settings.ForgetRecent(url)) { _host.Settings.Save(); PushState(); }
                 break;
         }
+    }
+
+    /// <summary>Opens the viewer window on another PC's link and remembers the link.</summary>
+    private void Connect(string url)
+    {
+        if (!Settings.AppSettings.IsViewerLink(url))
+        {
+            Post(new { type = "connectError", error = "Ce n’est pas un lien se7en Vision. Il ressemble à https://….trycloudflare.com/s/…" });
+            return;
+        }
+        if (CurrentLink() is { } mine && url.StartsWith(mine, StringComparison.Ordinal))
+        {
+            Post(new { type = "connectError", error = "C’est le lien de ce PC-ci. Entre celui affiché sur l’autre PC." });
+            return;
+        }
+        var existing = _viewers.FirstOrDefault(v => v.Link == url && !v.IsDisposed);
+        if (existing != null) { existing.Activate(); return; }
+        _host.Settings.AddRecent(url);
+        _host.Settings.Save();
+        var form = new ViewerForm(url);
+        form.PcNamed += name => { if (_host.Settings.RenameRecent(url, name)) { _host.Settings.Save(); PushStateSoon(); } };
+        form.FormClosed += (_, _) => _viewers.Remove(form);
+        _viewers.Add(form);
+        form.Show();
+        PushState();
+    }
+
+    private void Post(object message)
+    {
+        if (_webReady) _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
     }
 
     private string? CurrentLink() =>
@@ -167,6 +205,7 @@ public sealed class MainForm : Form
             connectedMinutes = _session.ConnectedSince is { } since ? (int)(DateTime.Now - since).TotalMinutes : 0,
             failed = _session.FailedAttempts,
             maxAttempts = SessionManager.MaxAttempts,
+            recent = _host.Settings.Recent.Select(r => new { r.Url, r.Name, at = r.At.ToString("o"), host = new Uri(r.Url).Host, open = _viewers.Any(v => v.Link == r.Url && !v.IsDisposed) }),
         };
         _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(state));
     }

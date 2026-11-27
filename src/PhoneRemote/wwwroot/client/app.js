@@ -297,6 +297,7 @@ function onInfo(m) {
   info = m;
   hostV2 = (m.v || 1) >= 2;
   $('pcName').textContent = m.pc || 'PC';
+  document.title = 'se7en Vision — ' + (m.pc || 'PC');
   if (!m.screens) m.screens = [{ i: m.screen || 0, x: 0, y: 0, w: m.w, h: m.h, primary: true }];
   const mosaic = m.mosaic && m.mosaic.cells ? m.mosaic : null;
   if (mosaic) layout.setImage(mosaic.w, mosaic.h, mosaic); else layout.setImage(m.w, m.h, null);
@@ -328,6 +329,13 @@ function renderScreens(m) {
     b.onclick = () => { send({ t: 'screen', i: s.i }); closeSheet(); };
     return b;
   });
+  if (screens.length > 1 && hostV2) {
+    const b = document.createElement('button');
+    b.className = 'ca-seg__item' + (m.mosaic ? ' is-active' : '');
+    b.textContent = 'Tous';
+    b.onclick = () => { send({ t: 'screen', i: 'all' }); closeSheet(); hint('Tous les écrans : image réduite, 30 i/s'); };
+    items.push(b);
+  }
   seg.replaceChildren(...items);
 }
 

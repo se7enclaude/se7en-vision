@@ -33,6 +33,53 @@
   $('disconnectBtn').addEventListener('click', () => { send('disconnect'); toast('Téléphone déconnecté', 'unplug'); });
   $('retryBtn').addEventListener('click', () => send('retryTunnel'));
 
+  // ---------- Tabs ----------
+  function showTab(name) {
+    document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('is-active', b.dataset.tab === name));
+    $('tabHost').hidden = name !== 'host';
+    $('tabConnect').hidden = name !== 'connect';
+    try { localStorage.setItem('vision-tab', name); } catch {}
+    if (name === 'connect') setTimeout(() => $('connectUrl').focus(), 50);
+  }
+  document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  try { if (localStorage.getItem('vision-tab') === 'connect') showTab('connect'); } catch {}
+
+  // ---------- Se connecter à un PC ----------
+  const connectHint = $('connectHint');
+  const HINT_DEFAULT = connectHint.textContent;
+  function connectError(text) {
+    connectHint.textContent = text;
+    connectHint.classList.add('err');
+  }
+  $('connectUrl').addEventListener('input', () => { connectHint.textContent = HINT_DEFAULT; connectHint.classList.remove('err'); });
+  $('connectForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const url = $('connectUrl').value.trim();
+    if (!url) return;
+    if (!/^https?:\/\/\S+\/s\/[0-9a-f]{16,64}/i.test(url)) return connectError('Ce n’est pas un lien se7en Vision. Il ressemble à https://….trycloudflare.com/s/…');
+    send('connect', { url });
+  });
+  function renderRecent(list) {
+    const box = $('recentBox');
+    box.hidden = !list || !list.length;
+    if (box.hidden) return;
+    $('recentList').replaceChildren(...list.map((r) => {
+      const li = document.createElement('li');
+      li.className = 'recent-item';
+      const when = new Date(r.at);
+      const date = isNaN(when) ? '' : when.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' ' + when.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      li.innerHTML = `<span class="well${r.open ? ' on' : ''}"><i class="ca-icon icon-monitor"></i></span>
+        <div class="recent-text"><span class="recent-name"></span><span class="recent-sub"></span></div>
+        <button class="ca-btn ca-btn--primary ca-btn--sm" data-go><i class="ca-icon icon-cable"></i>${r.open ? 'Afficher' : 'Se connecter'}</button>
+        <button class="ca-ibtn ca-ibtn--glass" data-forget title="Oublier ce lien"><i class="ca-icon icon-x"></i></button>`;
+      li.querySelector('.recent-name').textContent = r.name || r.host;
+      li.querySelector('.recent-sub').textContent = (r.name ? r.host + ' · ' : '') + (r.open ? 'connecté' : date);
+      li.querySelector('[data-go]').addEventListener('click', () => send('connect', { url: r.url }));
+      li.querySelector('[data-forget]').addEventListener('click', () => send('forget', { url: r.url }));
+      return li;
+    }));
+  }
+
   // ---------- Code choisi par l'utilisateur (gardé d'une ouverture à l'autre) ----------
   let editing = false, lastState = null;
   function setEditing(on) {
@@ -142,6 +189,7 @@
       $('badgeText').textContent = 'Prêt';
     }
     $('disconnectBtn').hidden = !s.phone;
+    renderRecent(s.recent);
     if (s.phone && !lastPhone) toast(`${s.phoneName || 'Téléphone'} connecté`, 'smartphone');
     lastPhone = s.phone;
   }
@@ -151,6 +199,7 @@
       if (!e.data) return;
       if (e.data.type === 'state') render(e.data);
       else if (e.data.type === 'pinSaved') onPinSaved(e.data);
+      else if (e.data.type === 'connectError') connectError(e.data.error);
     });
     send('ready');
   }

@@ -42,6 +42,15 @@ internal static class Program
             return;
         }
 
+        // "se7en Vision.exe --viewer <lien>": only the « Se connecter à un PC » window, without hosting anything.
+        int vi = Array.IndexOf(args, "--viewer");
+        if (vi >= 0 && vi + 1 < args.Length && Settings.AppSettings.IsViewerLink(args[vi + 1]))
+        {
+            ApplicationConfiguration.Initialize();
+            Application.Run(new ViewerForm(args[vi + 1]));
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
 
         // Unexpected error: let go of every key/button the viewer held, log it, tell the user.

@@ -57,7 +57,9 @@ public class BandwidthTests
     public void A_viewer_that_cannot_keep_up_counts_as_congestion()
     {
         var c = New();
-        Assert.Equal(BandwidthAction.Down, c.Feed(new LinkSample(ViewerFps: 20, SentKbps: 5000, SentFps: 60), 30));
+        // the first seconds do not count: the viewer's decoder is still warming up
+        Assert.Equal(BandwidthAction.None, c.Feed(new LinkSample(ViewerFps: 20, SentKbps: 5000, SentFps: 60), 30));
+        Assert.Equal(BandwidthAction.Down, c.Feed(new LinkSample(ViewerFps: 20, SentKbps: 5000, SentFps: 60), 34));
         Assert.Equal("viewer", c.EstimateSource);
     }
 

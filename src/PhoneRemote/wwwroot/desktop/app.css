@@ -130,3 +130,36 @@ h1 { font: var(--type-h1); letter-spacing: var(--ls-heading); margin: 6px 0 6px;
   .pin { font-size: 44px; }
   h1 { font: var(--type-h2); }
 }
+
+/* ---------- Tabs ---------- */
+.tabs { margin-left: 6px; }
+.tabs .ca-tab .ca-icon { font-size: 16px; }
+
+/* ---------- Se connecter à un PC ---------- */
+.panel--connect { grid-template-columns: 1fr minmax(240px, 300px); align-content: start; }
+.connect-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.connect-form { display: flex; gap: 10px; align-items: center; }
+.connect-field { flex: 1; min-width: 0; }
+.connect-field .ca-field__input { font-size: 14px; }
+.hint.err { color: #D2302A; }
+[data-theme="dark"] .hint.err { color: #FF8A82; }
+.recent { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; min-height: 0; }
+.recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow: auto; max-height: 260px; }
+.recent-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 10px 10px 14px; border-radius: 16px;
+  background: var(--glass-fill); border: 1px solid var(--glass-stroke);
+}
+.recent-item .well { width: 38px; height: 38px; font-size: 18px; border-radius: 12px; }
+.recent-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.recent-name { font: var(--type-label); font-weight: var(--fw-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-sub { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-item .ca-ibtn { width: 34px; height: 34px; font-size: 15px; }
+.connect-side { display: flex; flex-direction: column; gap: 12px; padding: var(--pad-tile) 20px; align-self: start; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.steps li { display: flex; gap: 10px; align-items: flex-start; font: var(--type-label); font-weight: var(--fw-regular); color: var(--text-secondary); line-height: 1.4; }
+.step-n {
+  width: 24px; height: 24px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 12px; font-weight: var(--fw-bold); color: #fff;
+  background: var(--tone-violet);
+}

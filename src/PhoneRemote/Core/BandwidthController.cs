@@ -46,7 +46,8 @@ public sealed class BandwidthController
         if (s.DelayDeltaMs is { } d) _delayEma = _delayEma * 0.7 + d * 0.3;
         bool congested = _lossEma > 3 || _delayEma > 50;
         bool heavyLoss = _lossEma > 10;
-        bool starving = s.ViewerFps is { } vf && s.SentFps > 0 && vf < s.SentFps * 0.6 && s.SentKbps > 0;
+        // a viewer's first count is low (its decoder was just set up): wait 3 s before reading anything into it
+        bool starving = nowSeconds - _startAt >= 3 && s.ViewerFps is { } vf && s.SentFps > 0 && vf < s.SentFps * 0.6 && s.SentKbps > 0;
 
         double? est = null;
         if (nowSeconds - _rembAt < 3 && !double.IsNaN(_lastRemb)) { est = _lastRemb; EstimateSource = "remb"; }

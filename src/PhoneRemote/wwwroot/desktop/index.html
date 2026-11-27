@@ -11,6 +11,10 @@
   <header class="topbar ca-glass">
     <span class="wordmark">se7en Vision</span>
     <span id="badge" class="ca-badge ca-badge--well"><span class="ca-badge__dot"></span><span id="badgeText">Démarrage</span></span>
+    <nav class="ca-tabs ca-tabs--sm tabs" role="tablist">
+      <button class="ca-tab is-active" data-tab="host" role="tab"><i class="ca-icon icon-monitor"></i>Mon PC</button>
+      <button class="ca-tab" data-tab="connect" role="tab"><i class="ca-icon icon-cable"></i>Se connecter à un PC</button>
+    </nav>
     <span class="spacer"></span>
     <div class="ca-seg" role="group" aria-label="Thème">
       <button class="ca-seg__item" data-theme-btn="light"><i class="ca-icon icon-sun"></i>Clair</button>
@@ -18,7 +22,7 @@
     </div>
   </header>
 
-  <main class="panel ca-glass">
+  <main class="panel ca-glass" id="tabHost">
     <section class="qr-card ca-irid">
       <div class="qr-box" id="qrBox">
         <div class="qr-wait" id="qrWait">
@@ -73,6 +77,36 @@
         <button class="ca-btn ca-btn--danger ca-btn--md" id="disconnectBtn" hidden><i class="ca-icon icon-unplug"></i>Déconnecter</button>
       </div>
     </section>
+  </main>
+
+  <main class="panel panel--connect ca-glass" id="tabConnect" hidden>
+    <section class="connect-main">
+      <div>
+        <h1>Se connecter à un PC</h1>
+        <p class="sub">Colle le lien que l'autre personne voit dans son se7en Vision (bouton « copier le lien »). Son code te sera demandé, puis tu verras son écran dans une fenêtre, avec ta souris et ton clavier.</p>
+      </div>
+      <form class="connect-form" id="connectForm">
+        <label class="ca-field ca-field--well ca-field--lg connect-field">
+          <i class="ca-icon icon-link ca-field__icon"></i>
+          <input class="ca-field__input mono" id="connectUrl" placeholder="https://….trycloudflare.com/s/…" autocomplete="off" spellcheck="false" aria-label="Lien se7en Vision">
+        </label>
+        <button class="ca-btn ca-btn--primary ca-btn--lg" type="submit" id="connectBtn"><i class="ca-icon icon-cable"></i>Se connecter</button>
+      </form>
+      <span class="hint" id="connectHint">Le lien ne marche que tant que se7en Vision est ouvert sur l'autre PC.</span>
+      <div class="recent" id="recentBox" hidden>
+        <span class="caps">PC récents</span>
+        <ul class="recent-list" id="recentList"></ul>
+      </div>
+    </section>
+    <aside class="connect-side ca-tile">
+      <span class="caps">Comment ça marche</span>
+      <ol class="steps">
+        <li><span class="step-n">1</span><span>L'autre personne ouvre se7en Vision et te donne son lien et son code.</span></li>
+        <li><span class="step-n">2</span><span>Colle le lien ici : une fenêtre s'ouvre avec son écran.</span></li>
+        <li><span class="step-n">3</span><span>Quand les box le permettent, l'image passe en direct entre vos deux PC ; sinon par le tunnel sécurisé.</span></li>
+      </ol>
+      <span class="hint">Le PC contrôlé garde la main : il peut déconnecter à tout moment.</span>
+    </aside>
   </main>
 
   <footer class="foot">Ferme se7en Vision pour tout couper : le lien cesse aussitôt de fonctionner.</footer>

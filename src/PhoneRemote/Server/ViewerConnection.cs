@@ -216,7 +216,9 @@ public sealed class ViewerConnection
                 if (_frameWanted.CurrentCount == 0) _frameWanted.Release();
                 break;
             case "screen":
-                _screen = Math.Clamp(Json.Int(m, "i", 0), 0, Displays.All().Length - 1);
+                if (m.TryGetProperty("i", out var iv) && iv.ValueKind == JsonValueKind.String && iv.GetString() == "all")
+                    _mosaic = Displays.All().Length > 1;
+                else { _mosaic = false; _screen = Math.Clamp(Json.Int(m, "i", 0), 0, Displays.All().Length - 1); }
                 _forceFrame = true;
                 await SendInfo(ct);
                 if (VideoWanted) StartVideo();
@@ -319,6 +321,16 @@ public sealed class ViewerConnection
         if (_via == "rtc" && rtc is { Connected: true }) wanted = rtc.Codec; // the track was negotiated for one codec
         var enc = (_host.Probe.Best(_version >= 2 ? wanted : VideoCodec.H264, s.Encoder) ?? EncoderCatalog.Find("libx264"))!;
         bool drawMouse = !_cursorOn; // v2 viewers draw the pointer themselves
+        if (_mosaic && _version >= 2)
+        {
+            var all = Displays.All();
+            if (all.Length > 1)
+            {
+                var mosaicEnc = _host.Probe.Best(VideoCodec.H264, s.Encoder) ?? EncoderCatalog.Find("libx264")!;
+                return QualityPlanner.PlanMosaic(_mode, ScreensLayout.Mosaic(all), mosaicEnc.Caps, _phone, drawMouse);
+            }
+            _mosaic = false;
+        }
         return _version >= 2
             ? QualityPlanner.Plan(_mode, screen, enc.Caps, s.FpsCap, _phone, drawMouse, s.PowerSaver)
             : QualityPlanner.PlanV1(_v1Width, _v1Kbps, screen, enc.Caps, s.FpsCap, drawMouse, s.PowerSaver);
@@ -553,7 +565,7 @@ public sealed class ViewerConnection
             {
                 t = "info", v = Protocol.Version, screen = _screen, count = screens.Length, w = b.W, h = b.H, pc = Environment.MachineName,
                 screens = screens.Select(x => new { i = x.Index, x = x.X, y = x.Y, w = x.W, h = x.H, hz = x.Hz, primary = x.Primary, name = x.Name }),
-                mosaic = _mosaic,
+                mosaic = _mosaic ? MosaicInfo(screens) : null,
                 enc = enc == null ? null : new { id = enc.Id, codec = Protocol.CodecName(enc.Codec), gpu = enc.Gpu, maxFps = Math.Min(enc.MaxFps, s.FpsCap) },
                 features = s.Rtc ? new[] { "stat", "cur", "kd", "rtc" } : new[] { "stat", "cur", "kd" },
                 quality = QualityPlanner.ModeName(_mode),
@@ -644,6 +656,12 @@ public sealed class ViewerConnection
 
     /// <summary>Binary from a data channel (file chunks, later).</summary>
     private Task HandleBinary(byte[] data, CancellationToken ct) => Task.CompletedTask;
+
+    private static object MosaicInfo(ScreenInfo[] screens)
+    {
+        var m = ScreensLayout.Mosaic(screens);
+        return new { w = m.W, h = m.H, fps = m.Fps, cells = m.Cells.Select(c => new { i = c.Index, x = c.X, y = c.Y, w = c.W, h = c.H }) };
+    }
 
     private async Task SendText(string text, CancellationToken ct)
     {

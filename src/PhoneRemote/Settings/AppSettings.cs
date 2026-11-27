@@ -26,6 +26,8 @@ public sealed class AppSettings
     public bool OverlayVisible { get; set; } = true;
     public bool ProbeAll { get; set; }
     public long MaxFileBytes { get; set; } = 4L * 1024 * 1024 * 1024;
+    /// <summary>PCs this one connected to (« Se connecter à un PC »), most recent first.</summary>
+    public List<RecentLink> Recent { get; set; } = new();
 
     public static string FilePath => Path.Combine(AppInfo.DataDir, "settings.json");
 
@@ -48,6 +50,27 @@ public sealed class AppSettings
         File.Move(tmp, FilePath, overwrite: true);
     }
 
+    public const int MaxRecent = 8;
+
+    /// <summary>Remembers a link (moves it to the top when it is already there).</summary>
+    public void AddRecent(string url, string? name = null)
+    {
+        var existing = Recent.FirstOrDefault(r => r.Url == url);
+        Recent.Remove(existing!);
+        Recent.Insert(0, new RecentLink { Url = url, Name = name ?? existing?.Name ?? "", At = DateTime.Now });
+        if (Recent.Count > MaxRecent) Recent.RemoveRange(MaxRecent, Recent.Count - MaxRecent);
+    }
+
+    public bool RenameRecent(string url, string name)
+    {
+        var r = Recent.FirstOrDefault(r => r.Url == url);
+        if (r == null || r.Name == name) return false;
+        r.Name = name;
+        return true;
+    }
+
+    public bool ForgetRecent(string url) => Recent.RemoveAll(r => r.Url == url) > 0;
+
     public AppSettings Sanitised()
     {
         if (Quality is not ("fast" or "balanced" or "sharp")) Quality = "balanced";
@@ -55,6 +78,10 @@ public sealed class AppSettings
         FpsCap = Math.Clamp(FpsCap, 24, 240);
         if (Codec is not ("avc1" or "hvc1" or "av01")) Codec = "avc1";
         MaxFileBytes = Math.Clamp(MaxFileBytes, 1024 * 1024, 64L * 1024 * 1024 * 1024);
+        Recent ??= new();
+        Recent.RemoveAll(r => r == null || !IsViewerLink(r.Url));
+        if (Recent.Count > MaxRecent) Recent.RemoveRange(MaxRecent, Recent.Count - MaxRecent);
+        foreach (var r in Recent) r.Name = (r.Name ?? "").Trim();
         return this;
     }
 
@@ -81,12 +108,29 @@ public sealed class AppSettings
         return null;
     }
 
+    /// <summary>A se7en Vision link: https://…/s/&lt;token&gt; (http only on this machine, for tests).</summary>
+    public static bool IsViewerLink(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return false;
+        if (u.Scheme != "https" && !(u.Scheme == "http" && u.IsLoopback)) return false;
+        if (!System.Text.RegularExpressions.Regex.IsMatch(u.AbsolutePath, "^/s/[0-9a-f]{16,64}/?$")) return false;
+        return u.Fragment.Length == 0 || System.Text.RegularExpressions.Regex.IsMatch(u.Fragment, "^#k=[0-9a-f]{16,64}$");
+    }
+
     public string ResolvedDownloadsDir =>
         string.IsNullOrWhiteSpace(DownloadsDir)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", AppInfo.Name)
             : DownloadsDir;
 }
 
+public sealed class RecentLink
+{
+    public string Url { get; set; } = "";
+    public string Name { get; set; } = "";
+    public DateTime At { get; set; }
+}
+
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(AppSettings))]
+[JsonSerializable(typeof(List<RecentLink>))]
 internal partial class SettingsJson : JsonSerializerContext;
